@@ -6,7 +6,11 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rustyline = "8"
+rustyline = "9.0.0"
+regex="1.5.4"
+lazy_static="1.4.0"
+itertools="0.10.1"
+
 
 [[bin]]
 name = "step0_repl"
@@ -15,3 +19,7 @@ path = "step0_repl.rs"
 [[bin]]
 name = "step1_read_print"
 path = "step1_read_print.rs"
+
+[[bin]]
+name = "step2_eval"
+path = "step2_eval.rs"
