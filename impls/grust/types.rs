@@ -46,6 +46,8 @@ pub enum MalErr {
     WrongTypeForOperation,
     CalledNonFunctionType,
     SymbolNotDefined(String),
+    UnknownError,
+    WrongNumberOfArguments,
 }
 
 pub type MalRes = Result<MalType, MalErr>;

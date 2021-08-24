@@ -108,7 +108,9 @@ pub fn pr_str(value: MalRes, print_readably: bool) -> String {
         Err(MalErr::OddNumOfElems) => print!("Odd number of elements"),
         Err(MalErr::WrongTypeForOperation) => print!("Wrong data type for operation"),
         Err(MalErr::CalledNonFunctionType) => print!("Called non function type"),
-        Err(MalErr::SymbolNotDefined(symbol)) => print!("Symbol <{}> not defined", symbol),
+        Err(MalErr::SymbolNotDefined(sym)) => print!("{} not found", sym),
+        Err(MalErr::UnknownError) => print!("Unknown error"),
+        Err(MalErr::WrongNumberOfArguments) => print!("Wrong number of arguments"),
         _ => (),
     }
     result
