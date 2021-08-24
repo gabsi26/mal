@@ -107,6 +107,9 @@ pub fn pr_str(value: MalRes, print_readably: bool) -> String {
         Err(MalErr::UnknownSequenceEnd) => print!("unknown sequence end"),
         Err(MalErr::OddNumOfElems) => print!("Odd number of elements"),
         Err(MalErr::WrongTypeForOperation) => print!("Wrong data type for operation"),
+        Err(MalErr::CalledNonFunctionType) => print!("Called non function type"),
+        Err(MalErr::SymbolNotDefined(symbol)) => print!("Symbol <{}> not defined", symbol),
+        _ => (),
     }
     result
 }

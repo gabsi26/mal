@@ -1,4 +1,6 @@
-use crate::types::MalType::{False, Hash, Int, Keyword, List, Nil, Str, Symbol, True, Vector};
+use crate::types::MalType::{
+    False, Func, Hash, Int, Keyword, List, Nil, Str, Symbol, True, Vector,
+};
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -21,6 +23,17 @@ pub enum MalType {
     SpliceUnquote(Rc<MalType>),
     Deref(Rc<MalType>),
     Meta(Rc<MalType>, Rc<MalType>),
+    Func(fn(MalArgs) -> MalRes),
+}
+
+impl MalType {
+    pub fn apply(&self, args: MalArgs) -> MalRes {
+        if let Func(f) = *self {
+            f(args)
+        } else {
+            Err(MalErr::CalledNonFunctionType)
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
@@ -31,9 +44,12 @@ pub enum MalErr {
     UnknownSequenceEnd,
     OddNumOfElems,
     WrongTypeForOperation,
+    CalledNonFunctionType,
+    SymbolNotDefined(String),
 }
 
 pub type MalRes = Result<MalType, MalErr>;
+pub type MalArgs = Vec<MalType>;
 
 pub fn hash(seq: Vec<MalType>) -> MalRes {
     let mut hash: HashMap<String, MalType> = HashMap::new();
