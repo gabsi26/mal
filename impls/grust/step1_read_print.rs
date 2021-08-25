@@ -9,7 +9,7 @@ use crate::reader::read_str;
 #[allow(non_snake_case)]
 fn READ(input: &str) -> MalRes {
     // let mut reader = Reader::new();
-    read_str(input)
+    read_str(input.to_string())
 }
 
 #[allow(non_snake_case)]

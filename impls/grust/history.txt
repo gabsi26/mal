@@ -1,27 +1,4 @@
 #V2
-"\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"
-"\\""
-"\\"
-""
-"\\"
-""
-"\\"
-"\\\\"
-"\\\\\\\\"
-{}
-{a}
-{a 2}
-{"a" 2}
-:a
-{:a
-{:a s
-{:a s}
-{:a d}
-'1
-1
-2
-3
-1
 '1
 @d
 (+ 1 2)
@@ -99,3 +76,26 @@ d
 (do (prn 101))
 (str "\\\\"")
  (str "")
+(load-file "../tests/incA.mal")
+(inc4 3)
+(def! a (atom 2))
+(def! load-file (fn* (f) (eval (read-string (str "(do " (slurp f) "\\nnil)")))))
+(load-file "../tests/computations.mal")
+(load-file "../tests/inc.mal")
+(slurp "../tests/computations.mal"
+(slurp "../tests/computations.mal")
+(do (slurp "../tests/computations.mal"))
+(str (do (slurp "../tests/computations.mal")))
+(str "(do "(slurp "../tests/computations.mal") "\\nnil)")
+(eval (str "(do "(slurp "../tests/computations.mal") "\\nnil)"))
+(eval (read-string (str "(do "(slurp "../tests/computations.mal") "\\nnil)")))
+(read-string (str "(do "(slurp "../tests/computations.mal") "\\nnil)"))
+(def! atm (atom 9))
+atm
+(deref atm)
+@atm
+(def! atm (atom 9))
+(deref atm)
+@atm
+(def! atm (atom 9))
+@atm

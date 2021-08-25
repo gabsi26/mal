@@ -61,11 +61,6 @@ pub fn pr_str(value: MalRes, print_readably: bool) -> String {
             result.push_str(pr_str(Ok(Rc::try_unwrap(quoted).unwrap()), print_readably).as_str());
             result.push(')');
         }
-        Ok(MalType::Deref(quoted)) => {
-            result.push_str("(deref ");
-            result.push_str(pr_str(Ok(Rc::try_unwrap(quoted).unwrap()), print_readably).as_str());
-            result.push(')');
-        }
         Ok(MalType::Meta(hash, vec)) => {
             result.push_str("(with-meta ");
             result.push_str(pr_str(Ok(Rc::try_unwrap(vec).unwrap()), print_readably).as_str());
@@ -80,6 +75,9 @@ pub fn pr_str(value: MalRes, print_readably: bool) -> String {
             env: _,
             params: _,
         }) => result.push_str("#<function>"),
+        Ok(MalType::Atom(a)) => {
+            result.push_str(format!("(atom {})", pr_str(Ok(a.borrow().to_owned()), true)).as_str())
+        }
         Ok(MalType::Nil) => result.push_str("nil"),
         Ok(MalType::True) => result.push_str("true"),
         Ok(MalType::False) => result.push_str("false"),
@@ -93,6 +91,7 @@ pub fn pr_str(value: MalRes, print_readably: bool) -> String {
         Err(MalErr::SymbolNotDefined(sym)) => print!("{} not found", sym),
         Err(MalErr::UnknownError) => print!("Unknown error"),
         Err(MalErr::WrongNumberOfArguments) => print!("Wrong number of arguments"),
+        Err(MalErr::ReadError) => print!("Read error"),
         _ => (),
     }
     result

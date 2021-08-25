@@ -1,11 +1,12 @@
 use crate::types::{MalErr, MalRes, MalType};
 
+use crate::list;
+use crate::types::MalType::List;
 use std::cell::RefCell;
 use std::{collections::HashMap, rc::Rc};
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct EnvStruct {
-    outer: Option<Rc<EnvStruct>>,
+    pub outer: Option<Rc<EnvStruct>>,
     data: RefCell<HashMap<String, MalType>>,
 }
 
@@ -25,11 +26,7 @@ pub fn env_bind(outer: Option<Env>, mbinds: MalType, exprs: Vec<MalType>) -> Res
             for (i, b) in binds.iter().enumerate() {
                 match b {
                     MalType::Symbol(s) if s == "&" => {
-                        env_set(
-                            &env,
-                            binds[i + 1].clone(),
-                            MalType::List(exprs[i..].to_vec()),
-                        )?;
+                        env_set(&env, binds[i + 1].clone(), list!(exprs[i..].to_vec()))?;
                         break;
                     }
                     _ => {

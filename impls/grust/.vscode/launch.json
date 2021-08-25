@@ -188,6 +188,24 @@
             },
             "args": [],
             "cwd": "${workspaceFolder}"
-        }
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'step6_file'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=step6_file",
+                    "--package=grust"
+                ],
+                "filter": {
+                    "name": "step6_file",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
     ]
 }

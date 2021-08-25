@@ -1,9 +1,15 @@
+use std::borrow::BorrowMut;
+use std::fs::File;
+use std::io::Read;
+use std::rc::Rc;
+
 use crate::printer::pr_seq;
+use crate::read_str;
 use crate::types::MalType::{
     False, Func, Hash, Int, Keyword, List, MalFunc, Nil, Str, Symbol, True, Vector,
 };
 use crate::types::{
-    func, MalArgs, MalErr,
+    atom, func, MalArgs, MalErr, MalRes,
     MalType::{self},
 };
 use crate::{list, vector};
@@ -15,6 +21,23 @@ macro_rules! fn_t_int_int {
             _ => Err(MalErr::WrongTypeForOperation),
         }
     }};
+}
+
+macro_rules! fn_str {
+    ($fn:expr) => {{
+        |a: MalArgs| match a[0].clone() {
+            Str(a0) => $fn(a0),
+            _ => Err(MalErr::WrongTypeForOperation),
+        }
+    }};
+}
+
+fn slurp(f: String) -> MalRes {
+    let mut s = String::new();
+    match File::open(f).and_then(|mut f| f.read_to_string(&mut s)) {
+        Ok(_) => Ok(MalType::Str(s)),
+        Err(e) => Err(MalErr::ReadError),
+    }
 }
 
 pub fn ns() -> Vec<(&'static str, MalType)> {
@@ -150,5 +173,12 @@ pub fn ns() -> Vec<(&'static str, MalType)> {
                 Ok(MalType::Nil)
             }),
         ),
+        ("read-string", func(fn_str!(|s| { read_str(s) }))),
+        ("slurp", func(fn_str!(|s| { slurp(s) }))),
+        ("atom", func(|c| Ok(atom(&c[0])))),
+        ("atom?", func(|c| Ok(c[0].is_atom()))),
+        ("deref", func(|c| c[0].deref())),
+        ("reset!", func(|c| c[0].reset_bang(&c[1].clone()))),
+        ("swap!", func(|c| c[0].swap_bang(&c[1..].to_vec()))),
     ]
 }

@@ -13,7 +13,7 @@ use crate::printer::pr_str;
 use crate::reader::read_str;
 use crate::types::MalType::{List, Nil, Vector};
 pub mod environment;
-use crate::types::{MalErr, MalType};
+use crate::types::{MalArgs, MalErr, MalType};
 
 use crate::environment::{env_bind, env_get, env_new, env_set, env_sets, Env};
 
@@ -24,19 +24,16 @@ fn READ(input: &str) -> MalRes {
 
 fn eval_ast(ast: &MalType, env: &Env) -> MalRes {
     match ast {
-        MalType::Symbol(_) => match env_get(env, ast) {
-            Ok(value) => Ok(value),
-            Err(err) => Err(err),
-        },
+        MalType::Symbol(_) => Ok(env_get(&env, &ast)?),
         MalType::List(list) => {
-            let mut evaluated: Vec<MalType> = vec![];
+            let mut evaluated: MalArgs = vec![];
             for value in list.iter() {
                 evaluated.push(EVAL(value.clone(), env.clone())?);
             }
             Ok(list!(evaluated))
         }
         MalType::Vector(vector) => {
-            let mut evaluated: Vec<MalType> = vec![];
+            let mut evaluated: MalArgs = vec![];
             for value in vector.iter() {
                 evaluated.push(EVAL(value.clone(), env.clone())?);
             }
@@ -45,10 +42,11 @@ fn eval_ast(ast: &MalType, env: &Env) -> MalRes {
         MalType::Hash(hash) => {
             let mut evaluated: HashMap<String, MalType> = HashMap::new();
             for (key, value) in hash.iter() {
-                evaluated.insert(key.clone(), EVAL(value.clone(), env.clone())?);
+                evaluated.insert(key.to_string(), EVAL(value.clone(), env.clone())?);
             }
             Ok(MalType::Hash(Rc::new(evaluated)))
         }
+
         _ => Ok(ast.clone()),
     }
 }
@@ -56,6 +54,7 @@ fn eval_ast(ast: &MalType, env: &Env) -> MalRes {
 #[allow(non_snake_case)]
 fn EVAL(mut ast: MalType, mut env: Env) -> MalRes {
     let res: MalRes;
+
     'tco: loop {
         res = match ast.clone() {
             MalType::List(list) => {
@@ -65,17 +64,13 @@ fn EVAL(mut ast: MalType, mut env: Env) -> MalRes {
                 let a0 = &list[0];
                 match a0 {
                     MalType::Symbol(ref sym) if sym == "def!" => {
-                        if list.len() != 3 {
-                            Err(MalErr::WrongNumberOfArguments)
-                        } else {
-                            env_set(&env, list[1].clone(), EVAL(list[2].clone(), env.clone())?)
-                        }
+                        env_set(&env, list[1].clone(), EVAL(list[2].clone(), env.clone())?)
                     }
                     MalType::Symbol(ref sym) if sym == "let*" => {
-                        let env = env_new(Some(env.clone()));
+                        env = env_new(Some(env.clone()));
                         let (a1, a2) = (list[1].clone(), list[2].clone());
                         match a1 {
-                            MalType::List(binds) | MalType::Vector(binds) => {
+                            MalType::List(ref binds) | MalType::Vector(ref binds) => {
                                 for (b, e) in binds.iter().tuples() {
                                     match b {
                                         MalType::Symbol(_) => {
@@ -124,12 +119,19 @@ fn EVAL(mut ast: MalType, mut env: Env) -> MalRes {
                         env,
                         params: Rc::new(list[1].clone()),
                     }),
+                    MalType::Symbol(ref sym) if sym == "eval" => {
+                        ast = EVAL(list[1].clone(), env.clone())?;
+                        while let Some(ref e) = env.clone().outer {
+                            env = e.clone()
+                        }
+                        continue 'tco;
+                    }
                     _ => match eval_ast(&ast, &env)? {
                         MalType::List(ref list) => {
                             let f = &list[0].clone();
                             let args = list[1..].to_vec();
                             match f {
-                                MalType::Func(_) => list[0].apply(list[1..].to_vec()),
+                                MalType::Func(_) => f.apply(args),
                                 MalType::MalFunc {
                                     ast: mast,
                                     env: menv,
@@ -181,6 +183,10 @@ fn main() {
         env_sets(&repl_env, key, val);
     }
     let _ = rep("(def! not (fn* (a) (if a false true)))", &repl_env);
+    let _ = rep(
+        r#"(def! load-file (fn* (f) (eval (read-string (str "(do " (slurp f) "\nnil)")))))"#,
+        &repl_env,
+    );
     loop {
         let readline = rl.readline("user> ");
         match readline {

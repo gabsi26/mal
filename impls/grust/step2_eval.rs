@@ -4,10 +4,14 @@ mod reader;
 mod types;
 mod utils;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use crate::printer::pr_str;
 use crate::reader::read_str;
-use crate::types::{MalArgs, MalErr, MalType};
+use crate::types::{
+    MalArgs, MalErr,
+    MalType::{self, List, Vector},
+};
 
 pub type Env = HashMap<String, MalType>;
 
@@ -21,7 +25,7 @@ fn int_op(op: fn(isize, isize) -> isize, a: MalArgs) -> MalRes {
 #[allow(non_snake_case)]
 fn READ(input: &str) -> MalRes {
     // let mut reader = Reader::new();
-    read_str(input)
+    read_str(input.to_string())
 }
 
 fn eval_ast(ast: MalType, env: Env) -> MalRes {
@@ -32,24 +36,24 @@ fn eval_ast(ast: MalType, env: Env) -> MalRes {
         },
         MalType::List(list) => {
             let mut evaluated: Vec<MalType> = vec![];
-            for value in list {
-                evaluated.push(EVAL(Ok(value), env.clone())?);
+            for value in list.iter() {
+                evaluated.push(EVAL(Ok(value.clone()), env.clone())?);
             }
-            Ok(MalType::List(evaluated))
+            Ok(list!(evaluated))
         }
         MalType::Vector(vector) => {
             let mut evaluated: Vec<MalType> = vec![];
-            for value in vector {
-                evaluated.push(EVAL(Ok(value), env.clone())?);
+            for value in vector.iter() {
+                evaluated.push(EVAL(Ok(value.clone()), env.clone())?);
             }
-            Ok(MalType::Vector(evaluated))
+            Ok(vector!(evaluated))
         }
         MalType::Hash(hash) => {
             let mut evaluated: HashMap<String, MalType> = HashMap::new();
             for (key, value) in hash.iter() {
                 evaluated.insert(key.clone(), EVAL(Ok(value.clone()), env.clone())?);
             }
-            Ok(MalType::Hash(evaluated))
+            Ok(MalType::Hash(Rc::new(evaluated)))
         }
         _ => Ok(ast),
     }

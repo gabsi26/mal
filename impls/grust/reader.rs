@@ -1,9 +1,12 @@
-use crate::utils::unescape;
+use crate::{list, utils::unescape, vector};
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::rc::Rc;
 
-use crate::types::{hash, MalErr, MalRes, MalType};
+use crate::types::{
+    hash, MalErr, MalRes,
+    MalType::{self, List, Vector},
+};
 
 lazy_static! {
     static ref TOKEN_RE: Regex =
@@ -50,6 +53,13 @@ impl Reader {
                 self.next();
                 self.read_sequence('}')
             }
+            Some(Token::Special('@')) => {
+                self.next();
+                Ok(list!(vec![
+                    MalType::Symbol("deref".to_string()),
+                    self.read_form()?
+                ]))
+            }
             _ => self.read_atom(),
         }
     }
@@ -62,8 +72,8 @@ impl Reader {
         if self.peek() == Some(Token::Special(end)) {
             self.next();
             match end {
-                ')' => Ok(MalType::List(seq)),
-                ']' => Ok(MalType::Vector(seq)),
+                ')' => Ok(list!(seq)),
+                ']' => Ok(vector!(seq)),
                 '}' => hash(seq),
                 _ => Err(MalErr::UnknownSequenceEnd),
             }
@@ -94,7 +104,6 @@ impl Reader {
                 "'" => Ok(MalType::Quote(Rc::new(self.read_form()?))),
                 "`" => Ok(MalType::Quasiquote(Rc::new(self.read_form()?))),
                 "~" => Ok(MalType::Unquote(Rc::new(self.read_form()?))),
-                "@" => Ok(MalType::Deref(Rc::new(self.read_form()?))),
                 "^" => Ok(MalType::Meta(
                     Rc::new(self.read_form()?),
                     Rc::new(self.read_form()?),
@@ -102,14 +111,14 @@ impl Reader {
                 _ => Ok(MalType::Symbol(c.to_string())),
             },
             Some(Token::TildeAt) => Ok(MalType::SpliceUnquote(Rc::new(self.read_form()?))),
-            Some(_) => Err(MalErr::NotImplemented),
+            Some(_) => Ok(MalType::Nil),
             None => Err(MalErr::EndOfFile),
         }
     }
 }
 
-pub fn read_str(input: &str) -> MalRes {
-    let maybe_reader = tokenize(input);
+pub fn read_str(input: String) -> MalRes {
+    let maybe_reader = tokenize(input.as_str());
     if let Ok(mut reader) = maybe_reader {
         reader.read_form()
     } else {
@@ -144,7 +153,7 @@ pub fn tokenize(input: &str) -> Result<Reader, MalErr> {
             }
         }
         if let Some(semi_start) = m.name("sem") {
-            tokens.push(Token::Semi(semi_start.as_str().to_string()));
+            // tokens.push(Token::Semi(semi_start.as_str().to_string()));
         }
         if let Some(chars) = m.name("cha") {
             tokens.push(Token::Chars(chars.as_str().to_string()));

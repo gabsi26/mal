@@ -4,28 +4,29 @@ use crate::types::MalType::{
 };
 use itertools::Itertools;
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
 #[macro_export]
 macro_rules! list {
     ($seq:expr) => {{
-      List($seq)
+      List(Rc::new($seq))
     }};
     [$($args:expr),*] => {{
-      let v: Vec<MalType> = vec![$($args),*];
-      List(Rc::new(v),Rc::new(Nil))
+      let v: Vec<MalVal> = vec![$($args),*];
+      List(Rc::new(v))
     }}
   }
 
 #[macro_export]
 macro_rules! vector {
     ($seq:expr) => {{
-      Vector(Rc::new($seq),Rc::new(Nil))
+      Vector(Rc::new($seq))
     }};
     [$($args:expr),*] => {{
       let v: Vec<MalType> = vec![$($args),*];
-      Vector(Rc::new(v),Rc::new(Nil))
+      Vector(Rc::new(v))
     }}
   }
 
@@ -34,9 +35,9 @@ pub enum MalType {
     Nil,
     True,
     False,
-    List(Vec<MalType>),
-    Vector(Vec<MalType>),
-    Hash(HashMap<String, MalType>),
+    List(Rc<Vec<MalType>>),
+    Vector(Rc<Vec<MalType>>),
+    Hash(Rc<HashMap<String, MalType>>),
     Int(isize),
     Symbol(String),
     Str(String),
@@ -45,7 +46,6 @@ pub enum MalType {
     Quasiquote(Rc<MalType>),
     Unquote(Rc<MalType>),
     SpliceUnquote(Rc<MalType>),
-    Deref(Rc<MalType>),
     Meta(Rc<MalType>, Rc<MalType>),
     Func(fn(MalArgs) -> MalRes),
     MalFunc {
@@ -54,6 +54,7 @@ pub enum MalType {
         env: Env,
         params: Rc<MalType>,
     },
+    Atom(Rc<RefCell<MalType>>),
 }
 
 impl MalType {
@@ -74,6 +75,43 @@ impl MalType {
             _ => Err(MalErr::CalledNonFunctionType),
         }
     }
+    pub fn is_atom(&self) -> MalType {
+        if let &MalType::Atom(_) = self {
+            MalType::True
+        } else {
+            MalType::False
+        }
+    }
+
+    pub fn deref(&self) -> MalRes {
+        match self {
+            MalType::Atom(a) => Ok(a.borrow().clone()),
+            _ => Err(MalErr::WrongTypeForOperation),
+        }
+    }
+
+    pub fn reset_bang(&self, new: &MalType) -> MalRes {
+        match self {
+            MalType::Atom(a) => {
+                *a.borrow_mut() = new.clone();
+                Ok(new.clone())
+            }
+            _ => Err(MalErr::WrongTypeForOperation),
+        }
+    }
+
+    pub fn swap_bang(&self, args: &MalArgs) -> MalRes {
+        match self {
+            MalType::Atom(a) => {
+                let f = &args[0];
+                let mut fargs = args[1..].to_vec();
+                fargs.insert(0, a.borrow().clone());
+                *a.borrow_mut() = f.apply(fargs)?;
+                Ok(a.borrow().clone())
+            }
+            _ => Err(MalErr::WrongTypeForOperation),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
@@ -88,6 +126,7 @@ pub enum MalErr {
     SymbolNotDefined(String),
     UnknownError,
     WrongNumberOfArguments,
+    ReadError,
 }
 
 pub type MalRes = Result<MalType, MalErr>;
@@ -106,11 +145,14 @@ pub fn hash(seq: Vec<MalType>) -> MalRes {
         };
         hash.insert(key.to_owned(), v.to_owned());
     }
-    Ok(MalType::Hash(hash))
+    Ok(MalType::Hash(Rc::new(hash)))
 }
 
 pub fn func(f: fn(MalArgs) -> MalRes) -> MalType {
     MalType::Func(f)
+}
+pub fn atom(mv: &MalType) -> MalType {
+    MalType::Atom(Rc::new(RefCell::new(mv.clone())))
 }
 
 impl PartialEq for MalType {
