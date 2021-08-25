@@ -55,9 +55,9 @@ pub fn env_get(env: &Env, key: &MalType) -> MalRes {
                 .data
                 .borrow()
                 .get(s)
-                .ok_or(MalErr::ErrStr(format!("{} not found", s.clone())))?
+                .ok_or(MalErr::ErrStr(format!("'{}' not found", s.clone())))?
                 .clone()),
-            _ => Err(MalErr::ErrStr(format!("{} not found", s.clone()))),
+            _ => Err(MalErr::ErrStr(format!("'{}' not found", s.clone()))),
         },
         _ => Err(MalErr::ErrStr("Non Symbol type found".to_string())),
     }

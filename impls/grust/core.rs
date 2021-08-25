@@ -8,7 +8,7 @@ use crate::types::MalType::{
     False, Func, Hash, Int, Keyword, List, MalFunc, Nil, Str, Symbol, True, Vector,
 };
 use crate::types::{
-    atom, func, MalArgs, MalErr, MalRes,
+    assoc, atom, dissoc, func, hash_map, keyword, symbol, vect, MalArgs, MalErr, MalRes,
     MalType::{self},
 };
 use crate::{list, vector};
@@ -17,7 +17,7 @@ macro_rules! fn_t_int_int {
     ($ret:ident, $fn:expr) => {{
         |a: MalArgs| match (a[0].clone(), a[1].clone()) {
             (Int(a0), Int(a1)) => Ok($ret($fn(a0, a1))),
-            _ => Err(MalErr::ErrStr("Non numeric arguments".to_string())),
+            _ => Err(MalErr::ErrStr("Error: Non numeric arguments".to_string())),
         }
     }};
 }
@@ -26,7 +26,7 @@ macro_rules! fn_str {
     ($fn:expr) => {{
         |a: MalArgs| match a[0].clone() {
             Str(a0) => $fn(a0),
-            _ => Err(MalErr::ErrStr("Expected String".to_string())),
+            _ => Err(MalErr::ErrStr("Error: Expected String".to_string())),
         }
     }};
 }
@@ -46,7 +46,7 @@ fn cons(args: MalArgs) -> MalRes {
             new_list.extend_from_slice(&list);
             Ok(list!(new_list.to_vec()))
         }
-        _ => Err(MalErr::ErrStr("Non list type found".to_string())),
+        _ => Err(MalErr::ErrStr("Error: Non list type found".to_string())),
     }
 }
 
@@ -60,7 +60,7 @@ fn concat(args: MalArgs) -> MalRes {
             MalType::List(l) | MalType::Vector(l) => {
                 new_list.extend_from_slice(&l);
             }
-            _ => return Err(MalErr::ErrStr("Non list type found".to_string())),
+            _ => return Err(MalErr::ErrStr("Error: Non list type found".to_string())),
         }
     }
     Ok(list!(new_list.to_vec()))
@@ -69,7 +69,7 @@ fn concat(args: MalArgs) -> MalRes {
 fn vec(a: MalArgs) -> MalRes {
     match a[0] {
         List(ref v) | Vector(ref v) => Ok(vector!(v.to_vec())),
-        _ => Err(MalErr::ErrStr("Non list type found".to_string())),
+        _ => Err(MalErr::ErrStr("Error: Non list type found".to_string())),
     }
 }
 
@@ -78,11 +78,11 @@ fn nth(a: MalArgs) -> MalRes {
         List(ref v) | Vector(ref v) => match a[1] {
             MalType::Int(index) => match v.get(index as usize) {
                 Some(val) => Ok(val.clone()),
-                _ => Err(MalErr::ErrStr("Index out of bounds".to_string())),
+                _ => Err(MalErr::ErrStr("Error: Index out of bounds".to_string())),
             },
-            _ => Err(MalErr::ErrStr("Expected Int".to_string())),
+            _ => Err(MalErr::ErrStr("Error: Expected Int".to_string())),
         },
-        _ => Err(MalErr::ErrStr("Non list type found".to_string())),
+        _ => Err(MalErr::ErrStr("Error: Non list type found".to_string())),
     }
 }
 
@@ -96,7 +96,9 @@ fn first(a: MalArgs) -> MalRes {
             }
         }
         Nil => Ok(Nil),
-        _ => Err(MalErr::ErrStr("Non-list or non-nil type found".to_string())),
+        _ => Err(MalErr::ErrStr(
+            "Error: Non-list or non-nil type found".to_string(),
+        )),
     }
 }
 
@@ -110,7 +112,128 @@ fn rest(a: MalArgs) -> MalRes {
             }
         }
         Nil => Ok(list!(vec![])),
-        _ => Err(MalErr::ErrStr("Non-list or non-nil type found".to_string())),
+        _ => Err(MalErr::ErrStr(
+            "Error: Non-list or non-nil type found".to_string(),
+        )),
+    }
+}
+
+fn apply(a: MalArgs) -> MalRes {
+    match a[a.len() - 1] {
+        List(ref v) | Vector(ref v) => {
+            let f = &a[0];
+            let mut fargs = a[1..a.len() - 1].to_vec();
+            fargs.extend_from_slice(&v);
+            f.apply(fargs)
+        }
+        _ => Err(MalErr::ErrStr(
+            "Error: Apply called with non list type".to_string(),
+        )),
+    }
+}
+
+fn map(a: MalArgs) -> MalRes {
+    match a[1] {
+        List(ref v) | Vector(ref v) => {
+            let mut res = vec![];
+            for mv in v.iter() {
+                res.push(a[0].apply(vec![mv.clone()])?)
+            }
+            Ok(list!(res))
+        }
+        _ => Err(MalErr::ErrStr(
+            "Error: map called with non list type".to_string(),
+        )),
+    }
+}
+
+fn get(a: MalArgs) -> MalRes {
+    match a[0].clone() {
+        Hash(hm) => match a[1].clone() {
+            MalType::Symbol(s) => {
+                if let Some(mv) = hm.get(&s) {
+                    Ok(mv.clone())
+                } else {
+                    Ok(MalType::Nil)
+                }
+            }
+            MalType::Keyword(s) => {
+                if let Some(mv) = hm.get(&s) {
+                    Ok(mv.clone())
+                } else {
+                    Ok(MalType::Nil)
+                }
+            }
+            MalType::Str(s) => {
+                if let Some(mv) = hm.get(&s) {
+                    Ok(mv.clone())
+                } else {
+                    Ok(MalType::Nil)
+                }
+            }
+            _ => return Err(MalErr::ErrStr("Wrong key type".to_string())),
+        },
+        _ => Ok(MalType::Nil),
+    }
+}
+
+fn contains(a: MalArgs) -> MalRes {
+    match a[0].clone() {
+        Hash(hm) => match a[1].clone() {
+            MalType::Symbol(s) => {
+                if hm.contains_key(&s) {
+                    Ok(MalType::True)
+                } else {
+                    Ok(MalType::False)
+                }
+            }
+            MalType::Keyword(s) => {
+                if hm.contains_key(&s) {
+                    Ok(MalType::True)
+                } else {
+                    Ok(MalType::False)
+                }
+            }
+            MalType::Str(s) => {
+                if hm.contains_key(&s) {
+                    Ok(MalType::True)
+                } else {
+                    Ok(MalType::False)
+                }
+            }
+            _ => return Err(MalErr::ErrStr("Wrong key type".to_string())),
+        },
+        _ => Ok(MalType::False),
+    }
+}
+
+fn keys(a: MalArgs) -> MalRes {
+    match a[0].clone() {
+        Hash(hm) => {
+            let mut list: MalArgs = vec![];
+            for key in hm.keys() {
+                if key.starts_with('\u{029e}') {
+                    list.push(MalType::Keyword(key.to_string()))
+                } else {
+                    list.push(MalType::Str(key.to_string()))
+                }
+            }
+            Ok(list!(list))
+        }
+        _ => Ok(MalType::False),
+    }
+}
+
+fn vals(a: MalArgs) -> MalRes {
+    match a[0].clone() {
+        Hash(hm) => {
+            let mut list: MalArgs = vec![];
+            for val in hm.values() {
+                list.push(val.clone());
+            }
+            Ok(list!(list))
+        }
+        _ => Ok(MalType::False),
     }
 }
 
@@ -251,6 +374,24 @@ pub fn ns() -> Vec<(&'static str, MalType)> {
         ("slurp", func(fn_str!(|s| { slurp(s) }))),
         ("atom", func(|c| Ok(atom(&c[0])))),
         ("atom?", func(|c| Ok(c[0].is_atom()))),
+        ("symbol", func(|c| symbol(&c[0]))),
+        ("symbol?", func(|c| Ok(c[0].is_symbol()))),
+        ("nil?", func(|c| Ok(c[0].is_nil()))),
+        ("true?", func(|c| Ok(c[0].is_true()))),
+        ("false?", func(|c| Ok(c[0].is_false()))),
+        ("keyword", func(|c| keyword(&c[0]))),
+        ("keyword?", func(|c| Ok(c[0].is_keyword()))),
+        ("vector", func(vect)),
+        ("vector?", func(|c| Ok(c[0].is_vector()))),
+        ("sequential?", func(|c| Ok(c[0].is_sequential()))),
+        ("hash-map", func(hash_map)),
+        ("get", func(get)),
+        ("contains?", func(contains)),
+        ("keys", func(keys)),
+        ("vals", func(vals)),
+        ("assoc", func(assoc)),
+        ("dissoc", func(dissoc)),
+        ("map?", func(|c| Ok(c[0].is_map()))),
         ("deref", func(|c| c[0].deref())),
         ("reset!", func(|c| c[0].reset_bang(&c[1].clone()))),
         ("swap!", func(|c| c[0].swap_bang(&c[1..].to_vec()))),
@@ -260,5 +401,8 @@ pub fn ns() -> Vec<(&'static str, MalType)> {
         ("nth", func(nth)),
         ("first", func(first)),
         ("rest", func(rest)),
+        ("throw", func(|c| Err(MalErr::ErrVal(c[0].clone())))),
+        ("apply", func(apply)),
+        ("map", func(map)),
     ]
 }

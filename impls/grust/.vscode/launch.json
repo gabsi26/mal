@@ -225,5 +225,23 @@
             "args": [],
             "cwd": "${workspaceFolder}"
         },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'step9_try'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=step9_try",
+                    "--package=grust"
+                ],
+                "filter": {
+                    "name": "step9_try",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
     ]
 }

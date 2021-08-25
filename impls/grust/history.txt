@@ -1,8 +1,4 @@
 #V2
-'1
-@d
-(+ 1 2)
-(+ 1 4)
 (+ 1 (- 3 2))
 (+ 1 2)
 (1 2)
@@ -99,3 +95,7 @@ atm
 @atm
 (def! atm (atom 9))
 @atm
+not
+load-file
+cond
+(try* abc (catch* exc (prn "exc is:" exc)))

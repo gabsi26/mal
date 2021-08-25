@@ -63,7 +63,9 @@ pub fn pr_str(value: MalRes, print_readably: bool) -> String {
         Ok(MalType::True) => result.push_str("true"),
         Ok(MalType::False) => result.push_str("false"),
         Err(MalErr::ErrStr(s)) => result.push_str(s.as_str()),
-        Err(MalErr::ErrVal(val)) => result.push_str(pr_str(Ok(val), print_readably).as_str()),
+        Err(MalErr::ErrVal(val)) => {
+            result.push_str(format!("Error: {}", pr_str(Ok(val), print_readably).as_str()).as_str())
+        }
         _ => (),
     }
     result

@@ -71,12 +71,68 @@ impl MalType {
                 Ok(eval(a.clone(), fn_env)?)
             }
             _ => Err(MalErr::ErrStr(
-                "Tried to call non function type".to_string(),
+                "Error: Tried to call non function type".to_string(),
             )),
         }
     }
     pub fn is_atom(&self) -> MalType {
-        if let &MalType::Atom(_) = self {
+        if let MalType::Atom(_) = self {
+            MalType::True
+        } else {
+            MalType::False
+        }
+    }
+    pub fn is_symbol(&self) -> MalType {
+        if let MalType::Symbol(_) = self {
+            MalType::True
+        } else {
+            MalType::False
+        }
+    }
+    pub fn is_nil(&self) -> MalType {
+        if let MalType::Nil = self {
+            MalType::True
+        } else {
+            MalType::False
+        }
+    }
+    pub fn is_true(&self) -> MalType {
+        if let MalType::True = self {
+            MalType::True
+        } else {
+            MalType::False
+        }
+    }
+    pub fn is_false(&self) -> MalType {
+        if let MalType::False = self {
+            MalType::True
+        } else {
+            MalType::False
+        }
+    }
+    pub fn is_keyword(&self) -> MalType {
+        if let MalType::Keyword(_) = self {
+            MalType::True
+        } else {
+            MalType::False
+        }
+    }
+    pub fn is_vector(&self) -> MalType {
+        if let MalType::Vector(_) = self {
+            MalType::True
+        } else {
+            MalType::False
+        }
+    }
+    pub fn is_sequential(&self) -> MalType {
+        if let MalType::Vector(_) | MalType::List(_) = self {
+            MalType::True
+        } else {
+            MalType::False
+        }
+    }
+    pub fn is_map(&self) -> MalType {
+        if let MalType::Hash(_) = self {
             MalType::True
         } else {
             MalType::False
@@ -86,7 +142,9 @@ impl MalType {
     pub fn deref(&self) -> MalRes {
         match self {
             MalType::Atom(a) => Ok(a.borrow().clone()),
-            _ => Err(MalErr::ErrStr("Tried to deref non atom type".to_string())),
+            _ => Err(MalErr::ErrStr(
+                "Error: Tried to deref non atom type".to_string(),
+            )),
         }
     }
 
@@ -96,7 +154,9 @@ impl MalType {
                 *a.borrow_mut() = new.clone();
                 Ok(new.clone())
             }
-            _ => Err(MalErr::ErrStr("Tried to reset non atom type".to_string())),
+            _ => Err(MalErr::ErrStr(
+                "Error: Tried to reset non atom type".to_string(),
+            )),
         }
     }
 
@@ -109,7 +169,9 @@ impl MalType {
                 *a.borrow_mut() = f.apply(fargs)?;
                 Ok(a.borrow().clone())
             }
-            _ => Err(MalErr::ErrStr("Tried to swap non atom type".to_string())),
+            _ => Err(MalErr::ErrStr(
+                "Error: Tried to swap non atom type".to_string(),
+            )),
         }
     }
 }
@@ -126,13 +188,19 @@ pub type MalArgs = Vec<MalType>;
 pub fn hash(seq: Vec<MalType>) -> MalRes {
     let mut hash: HashMap<String, MalType> = HashMap::new();
     if seq.len() % 2 != 0 {
-        return Err(MalErr::ErrStr("Odd number of elements in hash".to_string()));
+        return Err(MalErr::ErrStr(
+            "Error: Odd number of elements in hash".to_string(),
+        ));
     }
     for (k, v) in seq.iter().tuples() {
         let key = match k {
             Keyword(kw) => kw,
             Str(str) => str,
-            _ => return Err(MalErr::ErrStr("Wrong datatype used as hashkey".to_string())),
+            _ => {
+                return Err(MalErr::ErrStr(
+                    "Error: Wrong datatype used as hashkey".to_string(),
+                ))
+            }
         };
         hash.insert(key.to_owned(), v.to_owned());
     }
@@ -144,6 +212,101 @@ pub fn func(f: fn(MalArgs) -> MalRes) -> MalType {
 }
 pub fn atom(mv: &MalType) -> MalType {
     MalType::Atom(Rc::new(RefCell::new(mv.clone())))
+}
+
+pub fn symbol(a: &MalType) -> MalRes {
+    match a {
+        MalType::Str(s) => Ok(MalType::Symbol(s.to_string())),
+        _ => Err(MalErr::ErrStr(
+            "Tried to convert non string into symbol".to_string(),
+        )),
+    }
+}
+pub fn keyword(a: &MalType) -> MalRes {
+    match a {
+        MalType::Str(s) => Ok(MalType::Keyword(format!("\u{029e}{}", s))),
+        _ => Err(MalErr::ErrStr(
+            "Tried to convert non string into symbol".to_string(),
+        )),
+    }
+}
+
+pub fn vect(a: MalArgs) -> MalRes {
+    let mut vec: MalArgs = vec![];
+    for arg in a.iter() {
+        vec.push(arg.clone());
+    }
+    Ok(vector!(vec))
+}
+
+pub fn hash_map(a: MalArgs) -> MalRes {
+    let mut hm: HashMap<String, MalType> = HashMap::new();
+    for (key, val) in a.iter().tuples() {
+        match key {
+            MalType::Symbol(s) => {
+                hm.insert(s.clone(), val.clone());
+            }
+            MalType::Keyword(s) => {
+                hm.insert(s.clone(), val.clone());
+            }
+            MalType::Str(s) => {
+                hm.insert(s.clone(), val.clone());
+            }
+            _ => return Err(MalErr::ErrStr("Wrong key type".to_string())),
+        }
+    }
+    Ok(Hash(Rc::new(hm)))
+}
+
+pub fn assoc(a: MalArgs) -> MalRes {
+    match a[0].clone() {
+        MalType::Hash(ohm) => {
+            let mut hm: HashMap<String, MalType> = HashMap::new();
+            for (k, v) in ohm.clone().iter() {
+                hm.insert(k.clone(), v.clone());
+            }
+            for (key, val) in a[1..].iter().tuples() {
+                match key {
+                    MalType::Symbol(s) => {
+                        hm.insert(s.clone(), val.clone());
+                    }
+                    MalType::Keyword(s) => {
+                        hm.insert(s.clone(), val.clone());
+                    }
+                    MalType::Str(s) => {
+                        hm.insert(s.clone(), val.clone());
+                    }
+                    _ => return Err(MalErr::ErrStr("Wrong key type".to_string())),
+                }
+            }
+            Ok(Hash(Rc::new(hm)))
+        }
+        _ => Err(MalErr::ErrStr("Expected hash-map".to_string())),
+    }
+}
+
+pub fn dissoc(a: MalArgs) -> MalRes {
+    match a[0].clone() {
+        MalType::Hash(ohm) => {
+            let mut hm = (*ohm).clone();
+            for key in a[1..].iter() {
+                match key {
+                    MalType::Symbol(s) => {
+                        hm.remove(s);
+                    }
+                    MalType::Keyword(s) => {
+                        hm.remove(s);
+                    }
+                    MalType::Str(s) => {
+                        hm.remove(s);
+                    }
+                    _ => return Err(MalErr::ErrStr("Wrong key type".to_string())),
+                }
+            }
+            Ok(Hash(Rc::new(hm)))
+        }
+        _ => Err(MalErr::ErrStr("Expected hash-map".to_string())),
+    }
 }
 
 impl PartialEq for MalType {

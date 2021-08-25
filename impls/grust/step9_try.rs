@@ -158,13 +158,15 @@ fn EVAL(mut ast: MalType, mut env: Env) -> MalRes {
                                         }
                                         _ => {
                                             return Err(MalErr::ErrStr(
-                                                "Expected Symbol".to_string(),
+                                                "Error: Expected Symbol".to_string(),
                                             ))
                                         }
                                     }
                                 }
                             }
-                            _ => return Err(MalErr::ErrStr("Expected list type".to_string())),
+                            _ => {
+                                return Err(MalErr::ErrStr("Error: Expected list type".to_string()))
+                            }
                         }
                         ast = a2;
                         continue 'tco;
@@ -175,7 +177,9 @@ fn EVAL(mut ast: MalType, mut env: Env) -> MalRes {
                                 ast = list.last().unwrap_or(&Nil).clone();
                                 continue 'tco;
                             }
-                            _ => return Err(MalErr::ErrStr("Expected list type".to_string())),
+                            _ => {
+                                return Err(MalErr::ErrStr("Error: Expected list type".to_string()))
+                            }
                         }
                     }
                     MalType::Symbol(ref sym) if sym == "if" => {
@@ -222,7 +226,7 @@ fn EVAL(mut ast: MalType, mut env: Env) -> MalRes {
                                 },
                             )?),
                             _ => Err(MalErr::ErrStr(
-                                "Tried to set macro on non function".to_string(),
+                                "Error: Tried to set macro on non function".to_string(),
                             )),
                         }
                     }
@@ -230,6 +234,30 @@ fn EVAL(mut ast: MalType, mut env: Env) -> MalRes {
                         match macroexpand(list[1].clone(), &env) {
                             (_, Ok(new_ast)) => Ok(new_ast),
                             (_, e) => return e,
+                        }
+                    }
+                    MalType::Symbol(ref sym) if sym == "try*" => {
+                        match EVAL(list[1].clone(), env.clone()) {
+                            Err(ref e) if list.len() >= 3 => {
+                                let exc = match e {
+                                    MalErr::ErrStr(s) => MalType::Str(s.to_string()),
+                                    MalErr::ErrVal(mal_val) => mal_val.clone(),
+                                };
+                                match list[2].clone() {
+                                    List(c) => {
+                                        let catch_env = env_bind(
+                                            Some(env),
+                                            list!(vec![c[1].clone()]),
+                                            vec![exc],
+                                        )?;
+                                        EVAL(c[2].clone(), catch_env)
+                                    }
+                                    _ => Err(MalErr::ErrStr(
+                                        "Error: invalid catch block".to_string(),
+                                    )),
+                                }
+                            }
+                            res => res,
                         }
                     }
                     MalType::Symbol(ref sym) if sym == "eval" => {
@@ -266,11 +294,11 @@ fn EVAL(mut ast: MalType, mut env: Env) -> MalRes {
                                     continue 'tco;
                                 }
                                 _ => Err(MalErr::ErrStr(
-                                    "Tried to call non function type".to_string(),
+                                    "Error: Tried to call non function type".to_string(),
                                 )),
                             }
                         }
-                        _ => return Err(MalErr::ErrStr("Expected list type".to_string())),
+                        _ => return Err(MalErr::ErrStr("Error: Expected list type".to_string())),
                     },
                 }
             }
