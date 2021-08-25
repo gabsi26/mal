@@ -8,6 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::printer::pr_seq;
 use crate::read_str;
+#[allow(unused_imports)]
 use crate::types::MalType::{
     False, Func, Hash, Int, Keyword, List, MalFunc, Nil, Str, Symbol, True, Vector,
 };

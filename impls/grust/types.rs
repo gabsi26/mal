@@ -1,4 +1,4 @@
-use crate::environment::{env_bind, env_new, Env};
+use crate::environment::{env_bind, Env};
 use crate::types::MalType::{
     False, Func, Hash, Int, Keyword, List, MalFunc, Nil, Str, Symbol, True, Vector,
 };
@@ -43,6 +43,7 @@ pub enum MalType {
     Str(String),
     Keyword(String),
     Func(fn(MalArgs) -> MalRes, Rc<MalType>),
+    #[allow(dead_code)]
     MalFunc {
         eval: fn(ast: MalType, env: Env) -> MalRes,
         ast: Rc<MalType>,
@@ -75,6 +76,7 @@ impl MalType {
             )),
         }
     }
+    #[allow(dead_code)]
     pub fn is_atom(&self) -> MalType {
         if let MalType::Atom(_) = self {
             MalType::True
@@ -82,6 +84,7 @@ impl MalType {
             MalType::False
         }
     }
+    #[allow(dead_code)]
     pub fn is_symbol(&self) -> MalType {
         if let MalType::Symbol(_) = self {
             MalType::True
@@ -89,6 +92,7 @@ impl MalType {
             MalType::False
         }
     }
+    #[allow(dead_code)]
     pub fn is_nil(&self) -> MalType {
         if let MalType::Nil = self {
             MalType::True
@@ -96,6 +100,7 @@ impl MalType {
             MalType::False
         }
     }
+    #[allow(dead_code)]
     pub fn is_true(&self) -> MalType {
         if let MalType::True = self {
             MalType::True
@@ -103,6 +108,7 @@ impl MalType {
             MalType::False
         }
     }
+    #[allow(dead_code)]
     pub fn is_false(&self) -> MalType {
         if let MalType::False = self {
             MalType::True
@@ -110,6 +116,7 @@ impl MalType {
             MalType::False
         }
     }
+    #[allow(dead_code)]
     pub fn is_keyword(&self) -> MalType {
         if let MalType::Keyword(_) = self {
             MalType::True
@@ -117,6 +124,7 @@ impl MalType {
             MalType::False
         }
     }
+    #[allow(dead_code)]
     pub fn is_vector(&self) -> MalType {
         if let MalType::Vector(_, _) = self {
             MalType::True
@@ -124,6 +132,7 @@ impl MalType {
             MalType::False
         }
     }
+    #[allow(dead_code)]
     pub fn is_sequential(&self) -> MalType {
         if let MalType::Vector(_, _) | MalType::List(_, _) = self {
             MalType::True
@@ -131,6 +140,7 @@ impl MalType {
             MalType::False
         }
     }
+    #[allow(dead_code)]
     pub fn is_map(&self) -> MalType {
         if let MalType::Hash(_, _) = self {
             MalType::True
@@ -138,6 +148,7 @@ impl MalType {
             MalType::False
         }
     }
+    #[allow(dead_code)]
     pub fn is_string(&self) -> MalType {
         if let MalType::Str(_) = self {
             MalType::True
@@ -145,6 +156,7 @@ impl MalType {
             MalType::False
         }
     }
+    #[allow(dead_code)]
     pub fn is_number(&self) -> MalType {
         if let MalType::Int(__) = self {
             MalType::True
@@ -152,6 +164,7 @@ impl MalType {
             MalType::False
         }
     }
+    #[allow(dead_code)]
     pub fn is_fn(&self) -> MalType {
         match self {
             MalType::Func(_, _) => MalType::True,
@@ -159,6 +172,7 @@ impl MalType {
             _ => MalType::False,
         }
     }
+    #[allow(dead_code)]
     pub fn is_macro(&self) -> MalType {
         match self {
             MalType::MalFunc { is_macro: m, .. } if *m => MalType::True,
@@ -166,7 +180,7 @@ impl MalType {
             _ => MalType::False,
         }
     }
-
+    #[allow(dead_code)]
     pub fn deref(&self) -> MalRes {
         match self {
             MalType::Atom(a) => Ok(a.borrow().clone()),
@@ -175,7 +189,7 @@ impl MalType {
             )),
         }
     }
-
+    #[allow(dead_code)]
     pub fn reset_bang(&self, new: &MalType) -> MalRes {
         match self {
             MalType::Atom(a) => {
@@ -187,8 +201,8 @@ impl MalType {
             )),
         }
     }
-
-    pub fn swap_bang(&self, args: &MalArgs) -> MalRes {
+    #[allow(dead_code)]
+    pub fn swap_bang(&self, args: &[MalType]) -> MalRes {
         match self {
             MalType::Atom(a) => {
                 let f = &args[0];
@@ -206,6 +220,7 @@ impl MalType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum MalErr {
+    #[allow(dead_code)]
     ErrVal(MalType),
     ErrStr(String),
 }
@@ -234,14 +249,15 @@ pub fn hash(seq: Vec<MalType>) -> MalRes {
     }
     Ok(MalType::Hash(Rc::new(hash), Rc::new(MalType::Nil)))
 }
-
+#[allow(dead_code)]
 pub fn func(f: fn(MalArgs) -> MalRes) -> MalType {
     MalType::Func(f, Rc::new(MalType::Nil))
 }
+#[allow(dead_code)]
 pub fn atom(mv: &MalType) -> MalType {
     MalType::Atom(Rc::new(RefCell::new(mv.clone())))
 }
-
+#[allow(dead_code)]
 pub fn symbol(a: &MalType) -> MalRes {
     match a {
         MalType::Str(s) => Ok(MalType::Symbol(s.to_string())),
@@ -250,16 +266,17 @@ pub fn symbol(a: &MalType) -> MalRes {
         )),
     }
 }
+#[allow(dead_code)]
 pub fn keyword(a: &MalType) -> MalRes {
     match a {
         MalType::Str(s) => Ok(MalType::Keyword(format!("\u{029e}{}", s))),
-        MalType::Keyword(s) => Ok(a.clone()),
+        MalType::Keyword(_) => Ok(a.clone()),
         _ => Err(MalErr::ErrStr(
             "Tried to convert non string into keyword".to_string(),
         )),
     }
 }
-
+#[allow(dead_code)]
 pub fn vect(a: MalArgs) -> MalRes {
     let mut vec: MalArgs = vec![];
     for arg in a.iter() {
@@ -267,7 +284,7 @@ pub fn vect(a: MalArgs) -> MalRes {
     }
     Ok(vector!(vec))
 }
-
+#[allow(dead_code)]
 pub fn hash_map(a: MalArgs) -> MalRes {
     let mut hm: HashMap<String, MalType> = HashMap::new();
     for (key, val) in a.iter().tuples() {
@@ -286,12 +303,12 @@ pub fn hash_map(a: MalArgs) -> MalRes {
     }
     Ok(Hash(Rc::new(hm), Rc::new(MalType::Nil)))
 }
-
+#[allow(dead_code)]
 pub fn assoc(a: MalArgs) -> MalRes {
     match a[0].clone() {
         MalType::Hash(ohm, _) => {
             let mut hm: HashMap<String, MalType> = HashMap::new();
-            for (k, v) in ohm.clone().iter() {
+            for (k, v) in ohm.iter() {
                 hm.insert(k.clone(), v.clone());
             }
             for (key, val) in a[1..].iter().tuples() {
@@ -313,7 +330,7 @@ pub fn assoc(a: MalArgs) -> MalRes {
         _ => Err(MalErr::ErrStr("Expected hash-map".to_string())),
     }
 }
-
+#[allow(dead_code)]
 pub fn dissoc(a: MalArgs) -> MalRes {
     match a[0].clone() {
         MalType::Hash(ohm, _) => {

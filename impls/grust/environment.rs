@@ -12,6 +12,7 @@ pub struct EnvStruct {
 
 pub type Env = Rc<EnvStruct>;
 
+#[allow(dead_code)]
 pub fn env_new(outer: Option<Env>) -> Env {
     Rc::new(EnvStruct {
         data: RefCell::new(HashMap::default()),
@@ -19,6 +20,7 @@ pub fn env_new(outer: Option<Env>) -> Env {
     })
 }
 
+#[allow(dead_code)]
 pub fn env_bind(outer: Option<Env>, mbinds: MalType, exprs: Vec<MalType>) -> Result<Env, MalErr> {
     let env = env_new(outer);
     match mbinds {
@@ -40,6 +42,7 @@ pub fn env_bind(outer: Option<Env>, mbinds: MalType, exprs: Vec<MalType>) -> Res
     }
 }
 
+#[allow(dead_code)]
 pub fn env_find(env: &Env, key: &str) -> Option<Env> {
     match (env.data.borrow().contains_key(key), env.outer.clone()) {
         (true, _) => Some(env.clone()),
@@ -48,6 +51,7 @@ pub fn env_find(env: &Env, key: &str) -> Option<Env> {
     }
 }
 
+#[allow(dead_code)]
 pub fn env_get(env: &Env, key: &MalType) -> MalRes {
     match key {
         MalType::Symbol(ref s) => match env_find(env, s) {
@@ -55,7 +59,7 @@ pub fn env_get(env: &Env, key: &MalType) -> MalRes {
                 .data
                 .borrow()
                 .get(s)
-                .ok_or(MalErr::ErrStr(format!("'{}' not found", s.clone())))?
+                .ok_or_else(|| MalErr::ErrStr(format!("'{}' not found", s.clone())))?
                 .clone()),
             _ => Err(MalErr::ErrStr(format!("'{}' not found", s.clone()))),
         },
@@ -63,6 +67,7 @@ pub fn env_get(env: &Env, key: &MalType) -> MalRes {
     }
 }
 
+#[allow(dead_code)]
 pub fn env_set(env: &EnvStruct, key: MalType, val: MalType) -> MalRes {
     match key {
         MalType::Symbol(ref s) => {
@@ -73,6 +78,7 @@ pub fn env_set(env: &EnvStruct, key: MalType, val: MalType) -> MalRes {
     }
 }
 
+#[allow(dead_code)]
 pub fn env_sets(env: &Env, key: &str, val: MalType) {
     env.data.borrow_mut().insert(key.to_string(), val);
 }

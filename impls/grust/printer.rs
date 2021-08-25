@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use crate::types::{MalErr, MalRes, MalType};
 use crate::utils::escape;
 
