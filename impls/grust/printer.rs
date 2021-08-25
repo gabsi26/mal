@@ -3,13 +3,7 @@ use std::rc::Rc;
 use crate::types::{MalErr, MalRes, MalType};
 use crate::utils::escape;
 
-pub fn pr_seq(
-    seq: &Vec<MalType>,
-    print_readably: bool,
-    start: &str,
-    end: &str,
-    join: &str,
-) -> String {
+pub fn pr_seq(seq: &[MalType], print_readably: bool, start: &str, end: &str, join: &str) -> String {
     let strs: Vec<String> = seq
         .iter()
         .map(|x| pr_str(Ok(x.clone()), print_readably))
@@ -27,25 +21,11 @@ pub fn pr_str(value: MalRes, print_readably: bool) -> String {
             result.push_str(pr_seq(&vector, print_readably, "[", "]", " ").as_str())
         }
         Ok(MalType::Hash(hash)) => {
-            result.push('{');
-            for (key, value) in hash.iter() {
-                if key.starts_with('\u{029e}') {
-                    result.push_str(format!(":{}", &key[2..]).as_str());
-                } else {
-                    result.push('"');
-                    result.push_str(key);
-                    result.push('"');
-                }
-
-                result.push(' ');
-                result.push_str(pr_str(Ok(value.to_owned()), print_readably).as_str());
-                result.push(' ');
-            }
-            if result.len() > 1 {
-                result.remove(result.len() - 1);
-            }
-
-            result.push('}');
+            let h: Vec<MalType> = hash
+                .iter()
+                .flat_map(|(key, val)| vec![MalType::Str(key.to_string()), val.clone()])
+                .collect();
+            result.push_str(pr_seq(&h, print_readably, "{", "}", " ").as_str());
         }
         Ok(MalType::Int(num)) => result.push_str(num.to_string().as_str()),
         Ok(MalType::Symbol(symbol)) => result.push_str(symbol.as_str()),

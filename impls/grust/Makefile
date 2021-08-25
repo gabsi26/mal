@@ -15,7 +15,7 @@ mal: stepA_mal
 
 STEP0_DEPS = Cargo.toml
 STEP1_DEPS = $(STEP0_DEPS) types.rs reader.rs printer.rs
-STEP3_DEPS = $(STEP1_DEPS) env.rs
+STEP3_DEPS = $(STEP1_DEPS) environment.rs
 STEP4_DEPS = $(STEP3_DEPS) core.rs
 
 step0_repl: $(STEP0_DEPS)

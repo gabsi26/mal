@@ -1,4 +1,4 @@
-mod env;
+mod environment;
 mod printer;
 mod reader;
 mod types;

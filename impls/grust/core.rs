@@ -6,7 +6,8 @@ use crate::types::{
     func, MalArgs, MalErr,
     MalType::{self},
 };
-use std::rc::Rc;
+use crate::{list, vector};
+
 macro_rules! fn_t_int_int {
     ($ret:ident, $fn:expr) => {{
         |a: MalArgs| match (a[0].clone(), a[1].clone()) {
@@ -15,26 +16,6 @@ macro_rules! fn_t_int_int {
         }
     }};
 }
-
-macro_rules! list {
-    ($seq:expr) => {{
-      List($seq)
-    }};
-    [$($args:expr),*] => {{
-      let v: Vec<MalType> = vec![$($args),*];
-      List(Rc::new(v),Rc::new(Nil))
-    }}
-  }
-
-macro_rules! vector {
-    ($seq:expr) => {{
-      Vector(Rc::new($seq),Rc::new(Nil))
-    }};
-    [$($args:expr),*] => {{
-      let v: Vec<MalType> = vec![$($args),*];
-      Vector(Rc::new(v),Rc::new(Nil))
-    }}
-  }
 
 pub fn ns() -> Vec<(&'static str, MalType)> {
     vec![

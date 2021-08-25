@@ -1,4 +1,4 @@
-use crate::env::{env_bind, env_new, Env};
+use crate::environment::{env_bind, env_new, Env};
 use crate::types::MalType::{
     False, Func, Hash, Int, Keyword, List, MalFunc, Nil, Str, Symbol, True, Vector,
 };
@@ -6,6 +6,28 @@ use itertools::Itertools;
 
 use std::collections::HashMap;
 use std::rc::Rc;
+
+#[macro_export]
+macro_rules! list {
+    ($seq:expr) => {{
+      List($seq)
+    }};
+    [$($args:expr),*] => {{
+      let v: Vec<MalType> = vec![$($args),*];
+      List(Rc::new(v),Rc::new(Nil))
+    }}
+  }
+
+#[macro_export]
+macro_rules! vector {
+    ($seq:expr) => {{
+      Vector(Rc::new($seq),Rc::new(Nil))
+    }};
+    [$($args:expr),*] => {{
+      let v: Vec<MalType> = vec![$($args),*];
+      Vector(Rc::new(v),Rc::new(Nil))
+    }}
+  }
 
 #[derive(Debug, Clone)]
 pub enum MalType {
