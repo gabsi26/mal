@@ -1,4 +1,3 @@
-use std::borrow::BorrowMut;
 use std::fs::File;
 use std::io::Read;
 use std::rc::Rc;
@@ -36,7 +35,7 @@ fn slurp(f: String) -> MalRes {
     let mut s = String::new();
     match File::open(f).and_then(|mut f| f.read_to_string(&mut s)) {
         Ok(_) => Ok(MalType::Str(s)),
-        Err(e) => Err(MalErr::ReadError),
+        Err(_) => Err(MalErr::ReadError),
     }
 }
 
@@ -70,6 +69,47 @@ fn concat(args: MalArgs) -> MalRes {
 fn vec(a: MalArgs) -> MalRes {
     match a[0] {
         List(ref v) | Vector(ref v) => Ok(vector!(v.to_vec())),
+        _ => Err(MalErr::WrongTypeForOperation),
+    }
+}
+
+fn nth(a: MalArgs) -> MalRes {
+    match a[0] {
+        List(ref v) | Vector(ref v) => match a[1] {
+            MalType::Int(index) => match v.get(index as usize) {
+                Some(val) => Ok(val.clone()),
+                _ => Err(MalErr::IndexOutOfBounds),
+            },
+            _ => Err(MalErr::WrongTypeForOperation),
+        },
+        _ => Err(MalErr::WrongTypeForOperation),
+    }
+}
+
+fn first(a: MalArgs) -> MalRes {
+    match a[0] {
+        List(ref v) | Vector(ref v) => {
+            if v.is_empty() {
+                Ok(Nil)
+            } else {
+                Ok(v[0].clone())
+            }
+        }
+        Nil => Ok(Nil),
+        _ => Err(MalErr::WrongTypeForOperation),
+    }
+}
+
+fn rest(a: MalArgs) -> MalRes {
+    match a[0] {
+        List(ref v) | Vector(ref v) => {
+            if v.is_empty() {
+                Ok(list!(vec![]))
+            } else {
+                Ok(list!(v[1..].to_vec()))
+            }
+        }
+        Nil => Ok(list!(vec![])),
         _ => Err(MalErr::WrongTypeForOperation),
     }
 }
@@ -217,5 +257,8 @@ pub fn ns() -> Vec<(&'static str, MalType)> {
         ("cons", func(cons)),
         ("concat", func(concat)),
         ("vec", func(vec)),
+        ("nth", func(nth)),
+        ("first", func(first)),
+        ("rest", func(rest)),
     ]
 }

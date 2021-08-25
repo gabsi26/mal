@@ -49,6 +49,7 @@ pub enum MalType {
         ast: Rc<MalType>,
         env: Env,
         params: Rc<MalType>,
+        is_macro: bool,
     },
     Atom(Rc<RefCell<MalType>>),
 }
@@ -62,6 +63,7 @@ impl MalType {
                 ref ast,
                 ref env,
                 ref params,
+                ..
             } => {
                 let a = &**ast;
                 let p = &**params;
@@ -123,6 +125,7 @@ pub enum MalErr {
     UnknownError,
     WrongNumberOfArguments,
     ReadError,
+    IndexOutOfBounds,
 }
 
 pub type MalRes = Result<MalType, MalErr>;

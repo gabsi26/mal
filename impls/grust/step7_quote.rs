@@ -22,7 +22,7 @@ fn READ(input: &str) -> MalRes {
     read_str(input.to_string())
 }
 
-fn qq_iter(elts: &MalArgs) -> MalType {
+fn qq_iter(elts: &[MalType]) -> MalType {
     let mut acc = list![];
     for elt in elts.iter().rev() {
         if let List(v) = elt {
@@ -37,7 +37,7 @@ fn qq_iter(elts: &MalArgs) -> MalType {
         }
         acc = list![MalType::Symbol("cons".to_string()), quasiquote(&elt), acc];
     }
-    return acc;
+    acc
 }
 
 fn quasiquote(ast: &MalType) -> MalType {
@@ -50,7 +50,7 @@ fn quasiquote(ast: &MalType) -> MalType {
                     }
                 }
             }
-            return qq_iter(&v);
+            qq_iter(&v)
         }
         MalType::Vector(v) => return list![MalType::Symbol("vec".to_string()), qq_iter(&v)],
         MalType::Hash(_) | MalType::Symbol(_) => {
@@ -156,6 +156,7 @@ fn EVAL(mut ast: MalType, mut env: Env) -> MalRes {
                         ast: Rc::new(list[2].clone()),
                         env,
                         params: Rc::new(list[1].clone()),
+                        is_macro: false,
                     }),
                     MalType::Symbol(ref sym) if sym == "eval" => {
                         ast = EVAL(list[1].clone(), env.clone())?;

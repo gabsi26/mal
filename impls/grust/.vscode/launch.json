@@ -207,5 +207,23 @@
             "args": [],
             "cwd": "${workspaceFolder}"
         },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'step8_macros'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=step8_macros",
+                    "--package=grust"
+                ],
+                "filter": {
+                    "name": "step8_macros",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
     ]
 }

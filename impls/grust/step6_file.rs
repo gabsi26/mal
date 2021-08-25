@@ -118,6 +118,7 @@ fn EVAL(mut ast: MalType, mut env: Env) -> MalRes {
                         ast: Rc::new(list[2].clone()),
                         env,
                         params: Rc::new(list[1].clone()),
+                        is_macro: false,
                     }),
                     MalType::Symbol(ref sym) if sym == "eval" => {
                         ast = EVAL(list[1].clone(), env.clone())?;

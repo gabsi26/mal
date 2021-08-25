@@ -54,6 +54,7 @@ pub fn pr_str(value: MalRes, print_readably: bool) -> String {
             ast: _,
             env: _,
             params: _,
+            ..
         }) => result.push_str("#<function>"),
         Ok(MalType::Atom(a)) => {
             result.push_str(format!("(atom {})", pr_str(Ok(a.borrow().to_owned()), true)).as_str())

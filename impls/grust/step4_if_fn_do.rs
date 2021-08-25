@@ -107,8 +107,9 @@ fn EVAL(ast: MalType, env: Env) -> MalRes {
                     "fn*" => Ok(MalType::MalFunc {
                         eval: EVAL,
                         ast: Rc::new(list[2].clone()),
-                        env,
                         params: Rc::new(list[1].clone()),
+                        env,
+                        is_macro: false,
                     }),
                     _ => {
                         if let MalType::List(list) = eval_ast(&ast, &env)? {
