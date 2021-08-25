@@ -15,7 +15,7 @@ use crate::types::MalType::{List, Nil};
 pub mod environment;
 use crate::types::{MalErr, MalType};
 
-use crate::environment::{env_get, env_new, env_set, env_sets, Env};
+use crate::environment::{env_bind, env_get, env_new, env_set, env_sets, Env};
 
 macro_rules! list {
     ($seq:expr) => {{
@@ -64,22 +64,25 @@ fn eval_ast(ast: &MalType, env: &Env) -> MalRes {
 }
 
 #[allow(non_snake_case)]
-fn EVAL(ast: MalType, env: Env) -> MalRes {
-    match ast.clone() {
-        MalType::List(list) => {
-            if list.is_empty() {
-                Ok(ast)
-            } else if let MalType::Symbol(command) = list[0].clone() {
-                match command.as_str() {
-                    "def!" => {
+fn EVAL(mut ast: MalType, mut env: Env) -> MalRes {
+    let res: MalRes;
+    'tco: loop {
+        res = match ast.clone() {
+            MalType::List(list) => {
+                if list.is_empty() {
+                    return Ok(ast);
+                }
+                let a0 = &list[0];
+                match a0 {
+                    MalType::Symbol(ref sym) if sym == "def!" => {
                         if list.len() != 3 {
                             Err(MalErr::WrongNumberOfArguments)
                         } else {
                             env_set(&env, list[1].clone(), EVAL(list[2].clone(), env.clone())?)
                         }
                     }
-                    "let*" => {
-                        let let_env = env_new(Some(env));
+                    MalType::Symbol(ref sym) if sym == "let*" => {
+                        let env = env_new(Some(env.clone()));
                         let (a1, a2) = (list[1].clone(), list[2].clone());
                         match a1 {
                             MalType::List(binds) | MalType::Vector(binds) => {
@@ -87,9 +90,9 @@ fn EVAL(ast: MalType, env: Env) -> MalRes {
                                     match b {
                                         MalType::Symbol(_) => {
                                             let _ = env_set(
-                                                &let_env,
+                                                &env,
                                                 b.clone(),
-                                                EVAL(e.clone(), let_env.clone())?,
+                                                EVAL(e.clone(), env.clone())?,
                                             );
                                         }
                                         _ => return Err(MalErr::WrongTypeForOperation),
@@ -98,45 +101,69 @@ fn EVAL(ast: MalType, env: Env) -> MalRes {
                             }
                             _ => return Err(MalErr::WrongTypeForOperation),
                         }
-                        EVAL(a2, let_env)
+                        ast = a2;
+                        continue 'tco;
                     }
-                    "do" => match eval_ast(&list!(list[1..].to_vec()), &env)? {
-                        MalType::List(el) => Ok(el.last().unwrap_or(&Nil).clone()),
-                        _ => Err(MalErr::WrongTypeForOperation),
-                    },
-                    "if" => {
-                        let temp = EVAL(list[1].clone(), env.clone())?;
-                        if temp != MalType::Nil && temp != MalType::False {
-                            EVAL(list[2].clone(), env)
-                        } else if list.len() > 3 {
-                            EVAL(list[3].clone(), env)
-                        } else {
-                            Ok(MalType::Nil)
+                    MalType::Symbol(ref sym) if sym == "do" => {
+                        match eval_ast(&list!(list[1..list.len() - 1].to_vec()), &env)? {
+                            MalType::List(_) => {
+                                ast = list.last().unwrap_or(&Nil).clone();
+                                continue 'tco;
+                            }
+                            _ => Err(MalErr::WrongTypeForOperation),
                         }
                     }
-                    "fn*" => Ok(MalType::MalFunc {
+                    MalType::Symbol(ref sym) if sym == "if" => {
+                        let cond = EVAL(list[1].clone(), env.clone())?;
+                        match cond {
+                            MalType::False | MalType::Nil if list.len() >= 4 => {
+                                ast = list[3].clone();
+                                continue 'tco;
+                            }
+                            MalType::False | MalType::Nil => Ok(MalType::Nil),
+                            _ if list.len() >= 3 => {
+                                ast = list[2].clone();
+                                continue 'tco;
+                            }
+                            _ => Ok(Nil),
+                        }
+                    }
+                    MalType::Symbol(ref sym) if sym == "fn*" => Ok(MalType::MalFunc {
                         eval: EVAL,
                         ast: Rc::new(list[2].clone()),
                         env,
                         params: Rc::new(list[1].clone()),
                     }),
-                    _ => {
-                        if let MalType::List(list) = eval_ast(&ast, &env)? {
-                            list[0].apply(list[1..].to_vec())
-                        } else {
-                            Err(MalErr::CalledNonFunctionType)
+                    _ => match eval_ast(&ast, &env)? {
+                        MalType::List(ref list) => {
+                            let f = &list[0].clone();
+                            let args = list[1..].to_vec();
+                            match f {
+                                MalType::Func(_) => list[0].apply(list[1..].to_vec()),
+                                MalType::MalFunc {
+                                    ast: mast,
+                                    env: menv,
+                                    params,
+                                    ..
+                                } => {
+                                    let a = &**mast;
+                                    let p = &**params;
+                                    env = env_bind(Some(menv.clone()), p.clone(), args)?;
+                                    ast = a.clone();
+                                    continue 'tco;
+                                }
+                                _ => Err(MalErr::CalledNonFunctionType),
+                            }
                         }
-                    }
+                        _ => Err(MalErr::WrongTypeForOperation),
+                    },
                 }
-            } else if let MalType::List(list) = eval_ast(&ast, &env)? {
-                list[0].apply(list[1..].to_vec())
-            } else {
-                Err(MalErr::CalledNonFunctionType)
             }
-        }
-
-        _ => eval_ast(&ast, &env),
+            _ => eval_ast(&ast, &env),
+        };
+        break;
     }
+    res
 }
 
 #[allow(non_snake_case)]
