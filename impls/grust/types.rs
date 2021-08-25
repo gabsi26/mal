@@ -14,7 +14,7 @@ macro_rules! list {
       List(Rc::new($seq))
     }};
     [$($args:expr),*] => {{
-      let v: Vec<MalVal> = vec![$($args),*];
+      let v: Vec<MalType> = vec![$($args),*];
       List(Rc::new(v))
     }}
   }
@@ -42,10 +42,6 @@ pub enum MalType {
     Symbol(String),
     Str(String),
     Keyword(String),
-    Quote(Rc<MalType>),
-    Quasiquote(Rc<MalType>),
-    Unquote(Rc<MalType>),
-    SpliceUnquote(Rc<MalType>),
     Meta(Rc<MalType>, Rc<MalType>),
     Func(fn(MalArgs) -> MalRes),
     MalFunc {

@@ -60,6 +60,34 @@ impl Reader {
                     self.read_form()?
                 ]))
             }
+            Some(Token::Special('\'')) => {
+                self.next();
+                Ok(list!(vec![
+                    MalType::Symbol("quote".to_string()),
+                    self.read_form()?
+                ]))
+            }
+            Some(Token::Special('`')) => {
+                self.next();
+                Ok(list!(vec![
+                    MalType::Symbol("quasiquote".to_string()),
+                    self.read_form()?
+                ]))
+            }
+            Some(Token::Special('~')) => {
+                self.next();
+                Ok(list!(vec![
+                    MalType::Symbol("unquote".to_string()),
+                    self.read_form()?
+                ]))
+            }
+            Some(Token::TildeAt) => {
+                self.next();
+                Ok(list!(vec![
+                    MalType::Symbol("splice-unquote".to_string()),
+                    self.read_form()?
+                ]))
+            }
             _ => self.read_atom(),
         }
     }
@@ -101,16 +129,12 @@ impl Reader {
             }
             Some(Token::String(string)) => Ok(MalType::Str(string)),
             Some(Token::Special(c)) => match c.to_string().as_str() {
-                "'" => Ok(MalType::Quote(Rc::new(self.read_form()?))),
-                "`" => Ok(MalType::Quasiquote(Rc::new(self.read_form()?))),
-                "~" => Ok(MalType::Unquote(Rc::new(self.read_form()?))),
                 "^" => Ok(MalType::Meta(
                     Rc::new(self.read_form()?),
                     Rc::new(self.read_form()?),
                 )),
                 _ => Ok(MalType::Symbol(c.to_string())),
             },
-            Some(Token::TildeAt) => Ok(MalType::SpliceUnquote(Rc::new(self.read_form()?))),
             Some(_) => Ok(MalType::Nil),
             None => Err(MalErr::EndOfFile),
         }

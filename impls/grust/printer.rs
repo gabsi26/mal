@@ -41,26 +41,6 @@ pub fn pr_str(value: MalRes, print_readably: bool) -> String {
                 result.push_str(string.as_str())
             }
         }
-        Ok(MalType::Quote(quoted)) => {
-            result.push_str("(quote ");
-            result.push_str(pr_str(Ok(Rc::try_unwrap(quoted).unwrap()), print_readably).as_str());
-            result.push(')');
-        }
-        Ok(MalType::Quasiquote(quoted)) => {
-            result.push_str("(quasiquote ");
-            result.push_str(pr_str(Ok(Rc::try_unwrap(quoted).unwrap()), print_readably).as_str());
-            result.push(')');
-        }
-        Ok(MalType::Unquote(quoted)) => {
-            result.push_str("(unquote ");
-            result.push_str(pr_str(Ok(Rc::try_unwrap(quoted).unwrap()), print_readably).as_str());
-            result.push(')');
-        }
-        Ok(MalType::SpliceUnquote(quoted)) => {
-            result.push_str("(splice-unquote ");
-            result.push_str(pr_str(Ok(Rc::try_unwrap(quoted).unwrap()), print_readably).as_str());
-            result.push(')');
-        }
         Ok(MalType::Meta(hash, vec)) => {
             result.push_str("(with-meta ");
             result.push_str(pr_str(Ok(Rc::try_unwrap(vec).unwrap()), print_readably).as_str());

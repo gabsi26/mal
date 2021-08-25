@@ -40,6 +40,40 @@ fn slurp(f: String) -> MalRes {
     }
 }
 
+fn cons(args: MalArgs) -> MalRes {
+    match args[1].clone() {
+        List(list) | Vector(list) => {
+            let mut new_list = vec![args[0].clone()];
+            new_list.extend_from_slice(&list);
+            Ok(list!(new_list.to_vec()))
+        }
+        _ => Err(MalErr::WrongTypeForOperation),
+    }
+}
+
+fn concat(args: MalArgs) -> MalRes {
+    if args.is_empty() {
+        return Ok(list!(vec![]));
+    }
+    let mut new_list: MalArgs = vec![];
+    for list in args {
+        match list {
+            MalType::List(l) | MalType::Vector(l) => {
+                new_list.extend_from_slice(&l);
+            }
+            _ => return Err(MalErr::WrongTypeForOperation),
+        }
+    }
+    Ok(list!(new_list.to_vec()))
+}
+
+fn vec(a: MalArgs) -> MalRes {
+    match a[0] {
+        List(ref v) | Vector(ref v) => Ok(vector!(v.to_vec())),
+        _ => Err(MalErr::WrongTypeForOperation),
+    }
+}
+
 pub fn ns() -> Vec<(&'static str, MalType)> {
     vec![
         ("+", func(fn_t_int_int!(Int, |i, j| { i + j }))),
@@ -180,5 +214,8 @@ pub fn ns() -> Vec<(&'static str, MalType)> {
         ("deref", func(|c| c[0].deref())),
         ("reset!", func(|c| c[0].reset_bang(&c[1].clone()))),
         ("swap!", func(|c| c[0].swap_bang(&c[1..].to_vec()))),
+        ("cons", func(cons)),
+        ("concat", func(concat)),
+        ("vec", func(vec)),
     ]
 }
