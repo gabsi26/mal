@@ -17,7 +17,7 @@ macro_rules! fn_t_int_int {
     ($ret:ident, $fn:expr) => {{
         |a: MalArgs| match (a[0].clone(), a[1].clone()) {
             (Int(a0), Int(a1)) => Ok($ret($fn(a0, a1))),
-            _ => Err(MalErr::WrongTypeForOperation),
+            _ => Err(MalErr::ErrStr("Non numeric arguments".to_string())),
         }
     }};
 }
@@ -26,7 +26,7 @@ macro_rules! fn_str {
     ($fn:expr) => {{
         |a: MalArgs| match a[0].clone() {
             Str(a0) => $fn(a0),
-            _ => Err(MalErr::WrongTypeForOperation),
+            _ => Err(MalErr::ErrStr("Expected String".to_string())),
         }
     }};
 }
@@ -35,7 +35,7 @@ fn slurp(f: String) -> MalRes {
     let mut s = String::new();
     match File::open(f).and_then(|mut f| f.read_to_string(&mut s)) {
         Ok(_) => Ok(MalType::Str(s)),
-        Err(_) => Err(MalErr::ReadError),
+        Err(e) => Err(MalErr::ErrStr(format!("{}", e))),
     }
 }
 
@@ -46,7 +46,7 @@ fn cons(args: MalArgs) -> MalRes {
             new_list.extend_from_slice(&list);
             Ok(list!(new_list.to_vec()))
         }
-        _ => Err(MalErr::WrongTypeForOperation),
+        _ => Err(MalErr::ErrStr("Non list type found".to_string())),
     }
 }
 
@@ -60,7 +60,7 @@ fn concat(args: MalArgs) -> MalRes {
             MalType::List(l) | MalType::Vector(l) => {
                 new_list.extend_from_slice(&l);
             }
-            _ => return Err(MalErr::WrongTypeForOperation),
+            _ => return Err(MalErr::ErrStr("Non list type found".to_string())),
         }
     }
     Ok(list!(new_list.to_vec()))
@@ -69,7 +69,7 @@ fn concat(args: MalArgs) -> MalRes {
 fn vec(a: MalArgs) -> MalRes {
     match a[0] {
         List(ref v) | Vector(ref v) => Ok(vector!(v.to_vec())),
-        _ => Err(MalErr::WrongTypeForOperation),
+        _ => Err(MalErr::ErrStr("Non list type found".to_string())),
     }
 }
 
@@ -78,11 +78,11 @@ fn nth(a: MalArgs) -> MalRes {
         List(ref v) | Vector(ref v) => match a[1] {
             MalType::Int(index) => match v.get(index as usize) {
                 Some(val) => Ok(val.clone()),
-                _ => Err(MalErr::IndexOutOfBounds),
+                _ => Err(MalErr::ErrStr("Index out of bounds".to_string())),
             },
-            _ => Err(MalErr::WrongTypeForOperation),
+            _ => Err(MalErr::ErrStr("Expected Int".to_string())),
         },
-        _ => Err(MalErr::WrongTypeForOperation),
+        _ => Err(MalErr::ErrStr("Non list type found".to_string())),
     }
 }
 
@@ -96,7 +96,7 @@ fn first(a: MalArgs) -> MalRes {
             }
         }
         Nil => Ok(Nil),
-        _ => Err(MalErr::WrongTypeForOperation),
+        _ => Err(MalErr::ErrStr("Non-list or non-nil type found".to_string())),
     }
 }
 
@@ -110,7 +110,7 @@ fn rest(a: MalArgs) -> MalRes {
             }
         }
         Nil => Ok(list!(vec![])),
-        _ => Err(MalErr::WrongTypeForOperation),
+        _ => Err(MalErr::ErrStr("Non-list or non-nil type found".to_string())),
     }
 }
 

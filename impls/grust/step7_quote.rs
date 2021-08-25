@@ -118,11 +118,15 @@ fn EVAL(mut ast: MalType, mut env: Env) -> MalRes {
                                                 EVAL(e.clone(), env.clone())?,
                                             );
                                         }
-                                        _ => return Err(MalErr::WrongTypeForOperation),
+                                        _ => {
+                                            return Err(MalErr::ErrStr(
+                                                "Expected Symbol".to_string(),
+                                            ))
+                                        }
                                     }
                                 }
                             }
-                            _ => return Err(MalErr::WrongTypeForOperation),
+                            _ => return Err(MalErr::ErrStr("Expected list type".to_string())),
                         }
                         ast = a2;
                         continue 'tco;
@@ -133,7 +137,7 @@ fn EVAL(mut ast: MalType, mut env: Env) -> MalRes {
                                 ast = list.last().unwrap_or(&Nil).clone();
                                 continue 'tco;
                             }
-                            _ => Err(MalErr::WrongTypeForOperation),
+                            _ => return Err(MalErr::ErrStr("Expected list type".to_string())),
                         }
                     }
                     MalType::Symbol(ref sym) if sym == "if" => {
@@ -191,10 +195,12 @@ fn EVAL(mut ast: MalType, mut env: Env) -> MalRes {
                                     ast = a.clone();
                                     continue 'tco;
                                 }
-                                _ => Err(MalErr::CalledNonFunctionType),
+                                _ => Err(MalErr::ErrStr(
+                                    "Tried to call non function type".to_string(),
+                                )),
                             }
                         }
-                        _ => Err(MalErr::WrongTypeForOperation),
+                        _ => return Err(MalErr::ErrStr("Expected list type".to_string())),
                     },
                 }
             }

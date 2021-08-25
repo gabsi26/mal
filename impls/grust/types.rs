@@ -70,7 +70,9 @@ impl MalType {
                 let fn_env = env_bind(Some(env.clone()), p.clone(), args)?;
                 Ok(eval(a.clone(), fn_env)?)
             }
-            _ => Err(MalErr::CalledNonFunctionType),
+            _ => Err(MalErr::ErrStr(
+                "Tried to call non function type".to_string(),
+            )),
         }
     }
     pub fn is_atom(&self) -> MalType {
@@ -84,7 +86,7 @@ impl MalType {
     pub fn deref(&self) -> MalRes {
         match self {
             MalType::Atom(a) => Ok(a.borrow().clone()),
-            _ => Err(MalErr::WrongTypeForOperation),
+            _ => Err(MalErr::ErrStr("Tried to deref non atom type".to_string())),
         }
     }
 
@@ -94,7 +96,7 @@ impl MalType {
                 *a.borrow_mut() = new.clone();
                 Ok(new.clone())
             }
-            _ => Err(MalErr::WrongTypeForOperation),
+            _ => Err(MalErr::ErrStr("Tried to reset non atom type".to_string())),
         }
     }
 
@@ -107,25 +109,15 @@ impl MalType {
                 *a.borrow_mut() = f.apply(fargs)?;
                 Ok(a.borrow().clone())
             }
-            _ => Err(MalErr::WrongTypeForOperation),
+            _ => Err(MalErr::ErrStr("Tried to swap non atom type".to_string())),
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum MalErr {
-    NotImplemented,
-    EndOfFile,
-    UnmatchedDoubleQuote,
-    UnknownSequenceEnd,
-    OddNumOfElems,
-    WrongTypeForOperation,
-    CalledNonFunctionType,
-    SymbolNotDefined(String),
-    UnknownError,
-    WrongNumberOfArguments,
-    ReadError,
-    IndexOutOfBounds,
+    ErrVal(MalType),
+    ErrStr(String),
 }
 
 pub type MalRes = Result<MalType, MalErr>;
@@ -134,13 +126,13 @@ pub type MalArgs = Vec<MalType>;
 pub fn hash(seq: Vec<MalType>) -> MalRes {
     let mut hash: HashMap<String, MalType> = HashMap::new();
     if seq.len() % 2 != 0 {
-        return Err(MalErr::OddNumOfElems);
+        return Err(MalErr::ErrStr("Odd number of elements in hash".to_string()));
     }
     for (k, v) in seq.iter().tuples() {
         let key = match k {
             Keyword(kw) => kw,
             Str(str) => str,
-            _ => return Err(MalErr::WrongTypeForOperation),
+            _ => return Err(MalErr::ErrStr("Wrong datatype used as hashkey".to_string())),
         };
         hash.insert(key.to_owned(), v.to_owned());
     }

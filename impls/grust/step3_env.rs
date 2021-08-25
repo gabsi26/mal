@@ -19,7 +19,7 @@ use crate::environment::{env_get, env_new, env_set, Env};
 fn int_op(op: fn(isize, isize) -> isize, a: MalArgs) -> MalRes {
     match (a[0].clone(), a[1].clone()) {
         (MalType::Int(a), MalType::Int(b)) => Ok(MalType::Int(op(a, b))),
-        _ => Err(MalErr::WrongTypeForOperation),
+        _ => Err(MalErr::ErrStr("Non Int type found".to_string())),
     }
 }
 
@@ -69,11 +69,11 @@ fn EVAL(ast: MalType, env: Env) -> MalRes {
                 match command.as_str() {
                     "def!" => {
                         if list.len() != 3 {
-                            Err(MalErr::WrongNumberOfArguments)
+                            Err(MalErr::ErrStr("Wrong number of arguments".to_string()))
                         } else if let MalType::Symbol(_) = list[1].clone() {
                             env_set(&env, list[1].clone(), EVAL(list[2].clone(), env.clone())?)
                         } else {
-                            Err(MalErr::UnknownError)
+                            Err(MalErr::ErrStr("Unknown error".to_string()))
                         }
                     }
                     "let*" => {
@@ -90,11 +90,15 @@ fn EVAL(ast: MalType, env: Env) -> MalRes {
                                                 EVAL(e.clone(), let_env.clone())?,
                                             );
                                         }
-                                        _ => return Err(MalErr::WrongTypeForOperation),
+                                        _ => {
+                                            return Err(MalErr::ErrStr(
+                                                "Expected Symbol".to_string(),
+                                            ))
+                                        }
                                     }
                                 }
                             }
-                            _ => return Err(MalErr::WrongTypeForOperation),
+                            _ => return Err(MalErr::ErrStr("Expected list type".to_string())),
                         }
                         EVAL(a2, let_env)
                     }
@@ -102,25 +106,21 @@ fn EVAL(ast: MalType, env: Env) -> MalRes {
                         if let MalType::List(list) = eval_ast(&ast, &env)? {
                             list[0].apply(list[1..].to_vec())
                         } else {
-                            Err(MalErr::CalledNonFunctionType)
+                            Err(MalErr::ErrStr(
+                                "Tried to call non function type".to_string(),
+                            ))
                         }
                     }
                 }
             } else if let MalType::List(list) = eval_ast(&ast, &env)? {
                 list[0].apply(list[1..].to_vec())
             } else {
-                Err(MalErr::CalledNonFunctionType)
+                Err(MalErr::ErrStr(
+                    "Tried to call non function type".to_string(),
+                ))
             }
         }
-        // Ok(MalType::List(list)) => {
-        //     if list.is_empty() {
-        //         ast
-        //     } else if let MalType::List(list) = eval_ast(ast?, env)? {
-        //         list[0].apply(list[1..].to_vec())
-        //     } else {
-        //         Err(MalErr::CalledNonFunctionType)
-        //     }
-        // }
+
         _ => eval_ast(&ast, &env),
     }
 }

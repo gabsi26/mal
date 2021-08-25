@@ -63,7 +63,7 @@ fn EVAL(ast: MalType, env: Env) -> MalRes {
                 match command.as_str() {
                     "def!" => {
                         if list.len() != 3 {
-                            Err(MalErr::WrongNumberOfArguments)
+                            Err(MalErr::ErrStr("Wrong number of arguments".to_string()))
                         } else {
                             env_set(&env, list[1].clone(), EVAL(list[2].clone(), env.clone())?)
                         }
@@ -82,17 +82,21 @@ fn EVAL(ast: MalType, env: Env) -> MalRes {
                                                 EVAL(e.clone(), let_env.clone())?,
                                             );
                                         }
-                                        _ => return Err(MalErr::WrongTypeForOperation),
+                                        _ => {
+                                            return Err(MalErr::ErrStr(
+                                                "Expected Symbol".to_string(),
+                                            ))
+                                        }
                                     }
                                 }
                             }
-                            _ => return Err(MalErr::WrongTypeForOperation),
+                            _ => return Err(MalErr::ErrStr("Expected list type".to_string())),
                         }
                         EVAL(a2, let_env)
                     }
                     "do" => match eval_ast(&list!(list[1..].to_vec()), &env)? {
                         MalType::List(el) => Ok(el.last().unwrap_or(&Nil).clone()),
-                        _ => Err(MalErr::WrongTypeForOperation),
+                        _ => Err(MalErr::ErrStr("Expected list type".to_string())),
                     },
                     "if" => {
                         let temp = EVAL(list[1].clone(), env.clone())?;
@@ -115,14 +119,18 @@ fn EVAL(ast: MalType, env: Env) -> MalRes {
                         if let MalType::List(list) = eval_ast(&ast, &env)? {
                             list[0].apply(list[1..].to_vec())
                         } else {
-                            Err(MalErr::CalledNonFunctionType)
+                            Err(MalErr::ErrStr(
+                                "Tried to call non function type".to_string(),
+                            ))
                         }
                     }
                 }
             } else if let MalType::List(list) = eval_ast(&ast, &env)? {
                 list[0].apply(list[1..].to_vec())
             } else {
-                Err(MalErr::CalledNonFunctionType)
+                Err(MalErr::ErrStr(
+                    "Tried to call non function type".to_string(),
+                ))
             }
         }
 

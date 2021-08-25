@@ -103,10 +103,10 @@ impl Reader {
                 ')' => Ok(list!(seq)),
                 ']' => Ok(vector!(seq)),
                 '}' => hash(seq),
-                _ => Err(MalErr::UnknownSequenceEnd),
+                _ => Err(MalErr::ErrStr("Unknown sequence end".to_string())),
             }
         } else {
-            Err(MalErr::EndOfFile)
+            Err(MalErr::ErrStr("EOF".to_string()))
         }
     }
 
@@ -136,7 +136,7 @@ impl Reader {
                 _ => Ok(MalType::Symbol(c.to_string())),
             },
             Some(_) => Ok(MalType::Nil),
-            None => Err(MalErr::EndOfFile),
+            None => Err(MalErr::ErrStr("EOF".to_string())),
         }
     }
 }
@@ -146,7 +146,7 @@ pub fn read_str(input: String) -> MalRes {
     if let Ok(mut reader) = maybe_reader {
         reader.read_form()
     } else {
-        Err(MalErr::UnmatchedDoubleQuote)
+        Err(MalErr::ErrStr("unbalanced".to_string()))
     }
 }
 
@@ -170,10 +170,10 @@ pub fn tokenize(input: &str) -> Result<Reader, MalErr> {
                         unescape(&string.as_str()[1..string.as_str().len() - 1]).to_string(),
                     ));
                 } else {
-                    return Err(MalErr::UnmatchedDoubleQuote);
+                    return Err(MalErr::ErrStr("unbalanced".to_string()));
                 }
             } else {
-                return Err(MalErr::UnmatchedDoubleQuote);
+                return Err(MalErr::ErrStr("unbalanced".to_string()));
             }
         }
         if let Some(semi_start) = m.name("sem") {

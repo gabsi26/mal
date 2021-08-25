@@ -18,7 +18,7 @@ pub type Env = HashMap<String, MalType>;
 fn int_op(op: fn(isize, isize) -> isize, a: MalArgs) -> MalRes {
     match (a[0].clone(), a[1].clone()) {
         (MalType::Int(a), MalType::Int(b)) => Ok(MalType::Int(op(a, b))),
-        _ => Err(MalErr::WrongTypeForOperation),
+        _ => Err(MalErr::ErrStr("Non Int type found".to_string())),
     }
 }
 
@@ -32,7 +32,7 @@ fn eval_ast(ast: MalType, env: Env) -> MalRes {
     match ast {
         MalType::Symbol(sym) => match env.get(&sym) {
             Some(value) => Ok(value.clone()),
-            None => Err(MalErr::SymbolNotDefined(sym)),
+            None => Err(MalErr::ErrStr(format!("{} not found", sym))),
         },
         MalType::List(list) => {
             let mut evaluated: Vec<MalType> = vec![];
@@ -68,7 +68,9 @@ fn EVAL(ast: MalRes, env: Env) -> MalRes {
             } else if let MalType::List(list) = eval_ast(ast?, env)? {
                 list[0].apply(list[1..].to_vec())
             } else {
-                Err(MalErr::CalledNonFunctionType)
+                Err(MalErr::ErrStr(
+                    "Tried to call non function type".to_string(),
+                ))
             }
         }
         _ => eval_ast(ast?, env),

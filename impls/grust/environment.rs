@@ -36,7 +36,7 @@ pub fn env_bind(outer: Option<Env>, mbinds: MalType, exprs: Vec<MalType>) -> Res
             }
             Ok(env)
         }
-        _ => Err(MalErr::WrongTypeForOperation),
+        _ => Err(MalErr::ErrStr("Non-list type found".to_string())),
     }
 }
 
@@ -55,11 +55,11 @@ pub fn env_get(env: &Env, key: &MalType) -> MalRes {
                 .data
                 .borrow()
                 .get(s)
-                .ok_or(MalErr::SymbolNotDefined(s.clone()))?
+                .ok_or(MalErr::ErrStr(format!("{} not found", s.clone())))?
                 .clone()),
-            _ => Err(MalErr::SymbolNotDefined(s.clone())),
+            _ => Err(MalErr::ErrStr(format!("{} not found", s.clone()))),
         },
-        _ => Err(MalErr::WrongTypeForOperation),
+        _ => Err(MalErr::ErrStr("Non Symbol type found".to_string())),
     }
 }
 
@@ -69,7 +69,7 @@ pub fn env_set(env: &EnvStruct, key: MalType, val: MalType) -> MalRes {
             env.data.borrow_mut().insert(s.to_string(), val.clone());
             Ok(val)
         }
-        _ => Err(MalErr::WrongTypeForOperation),
+        _ => Err(MalErr::ErrStr("Non Symbol type found".to_string())),
     }
 }
 
