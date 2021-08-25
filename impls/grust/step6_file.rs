@@ -174,6 +174,9 @@ use rustyline::Editor;
 use types::MalRes;
 
 fn main() {
+    let mut args = std::env::args();
+    let arg1 = args.nth(1);
+
     let mut rl = Editor::<()>::new();
     if rl.load_history("history.txt").is_err() {
         println!("No previous history.");
@@ -182,11 +185,22 @@ fn main() {
     for (key, val) in ns() {
         env_sets(&repl_env, key, val);
     }
+    env_sets(&repl_env, "*ARGV*", list!(args.map(MalType::Str).collect()));
+
     let _ = rep("(def! not (fn* (a) (if a false true)))", &repl_env);
     let _ = rep(
         r#"(def! load-file (fn* (f) (eval (read-string (str "(do " (slurp f) "\nnil)")))))"#,
         &repl_env,
     );
+    if let Some(f) = arg1 {
+        match rep(&format!("(load-file \"{}\")", f), &repl_env) {
+            Ok(_) => std::process::exit(0),
+            Err(e) => {
+                println!("Error: {}", pr_str(Err(e), true));
+                std::process::exit(1);
+            }
+        }
+    }
     loop {
         let readline = rl.readline("user> ");
         match readline {
