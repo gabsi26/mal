@@ -15,11 +15,76 @@ use crate::types::MalType::{List, Nil, Vector};
 pub mod environment;
 use crate::types::{MalArgs, MalErr, MalType};
 
-use crate::environment::{env_bind, env_get, env_new, env_set, env_sets, Env};
+use crate::environment::{env_bind, env_find, env_get, env_new, env_set, env_sets, Env};
 
 #[allow(non_snake_case)]
 fn READ(input: &str) -> MalRes {
     read_str(input.to_string())
+}
+fn is_macro_call(ast: &MalType, env: &Env) -> Option<(MalType, MalArgs)> {
+    match ast {
+        List(v, _) => match v[0] {
+            MalType::Symbol(ref s) => match env_find(env, s) {
+                Some(e) => match env_get(&e, &v[0]) {
+                    Ok(f @ MalType::MalFunc { is_macro: true, .. }) => Some((f, v[1..].to_vec())),
+                    _ => None,
+                },
+                _ => None,
+            },
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn macroexpand(mut ast: MalType, env: &Env) -> (bool, MalRes) {
+    let mut was_expanded = false;
+    while let Some((mal_func, args)) = is_macro_call(&ast, &env) {
+        ast = match mal_func.apply(args) {
+            Err(e) => return (false, Err(e)),
+            Ok(a) => a,
+        };
+        was_expanded = true;
+    }
+    (was_expanded, Ok(ast))
+}
+
+fn qq_iter(elts: &[MalType]) -> MalType {
+    let mut acc = list![];
+    for elt in elts.iter().rev() {
+        if let List(v, _) = elt {
+            if v.len() == 2 {
+                if let MalType::Symbol(ref s) = v[0] {
+                    if s == "splice-unquote" {
+                        acc = list![MalType::Symbol("concat".to_string()), v[1].clone(), acc];
+                        continue;
+                    }
+                }
+            }
+        }
+        acc = list![MalType::Symbol("cons".to_string()), quasiquote(&elt), acc];
+    }
+    acc
+}
+
+fn quasiquote(ast: &MalType) -> MalType {
+    match ast {
+        List(v, _) => {
+            if v.len() == 2 {
+                if let MalType::Symbol(ref s) = v[0] {
+                    if s == "unquote" {
+                        return v[1].clone();
+                    }
+                }
+            }
+            qq_iter(&v)
+        }
+        MalType::Vector(v, _) => return list![MalType::Symbol("vec".to_string()), qq_iter(&v)],
+        MalType::Hash(_, _) | MalType::Symbol(_) => {
+            return list![MalType::Symbol("quote".to_string()), ast.clone()]
+        }
+        _ => ast.clone(),
+    }
 }
 
 fn eval_ast(ast: &MalType, env: &Env) -> MalRes {
@@ -61,6 +126,17 @@ fn EVAL(mut ast: MalType, mut env: Env) -> MalRes {
                 if list.is_empty() {
                     return Ok(ast);
                 }
+                match macroexpand(ast.clone(), &env) {
+                    (true, Ok(new_ast)) => {
+                        ast = new_ast;
+                        continue 'tco;
+                    }
+                    (_, Err(e)) => return Err(e),
+                    _ => (),
+                }
+                if list.is_empty() {
+                    return Ok(ast);
+                }
                 let a0 = &list[0];
                 match a0 {
                     MalType::Symbol(ref sym) if sym == "def!" => {
@@ -82,13 +158,15 @@ fn EVAL(mut ast: MalType, mut env: Env) -> MalRes {
                                         }
                                         _ => {
                                             return Err(MalErr::ErrStr(
-                                                "Expected Symbol".to_string(),
+                                                "Error: Expected Symbol".to_string(),
                                             ))
                                         }
                                     }
                                 }
                             }
-                            _ => return Err(MalErr::ErrStr("Expected list type".to_string())),
+                            _ => {
+                                return Err(MalErr::ErrStr("Error: Expected list type".to_string()))
+                            }
                         }
                         ast = a2;
                         continue 'tco;
@@ -99,7 +177,9 @@ fn EVAL(mut ast: MalType, mut env: Env) -> MalRes {
                                 ast = list.last().unwrap_or(&Nil).clone();
                                 continue 'tco;
                             }
-                            _ => return Err(MalErr::ErrStr("Expected list type".to_string())),
+                            _ => {
+                                return Err(MalErr::ErrStr("Error: Expected list type".to_string()))
+                            }
                         }
                     }
                     MalType::Symbol(ref sym) if sym == "if" => {
@@ -125,11 +205,76 @@ fn EVAL(mut ast: MalType, mut env: Env) -> MalRes {
                         is_macro: false,
                         meta: Rc::new(MalType::Nil),
                     }),
+                    MalType::Symbol(ref sym) if sym == "defmacro!" => {
+                        let (a1, a2) = (list[1].clone(), list[2].clone());
+                        let r = EVAL(a2, env)?;
+                        match r {
+                            MalType::MalFunc {
+                                eval,
+                                ast,
+                                env,
+                                params,
+                                ..
+                            } => Ok(env_set(
+                                &env,
+                                a1,
+                                MalType::MalFunc {
+                                    eval,
+                                    ast,
+                                    env: env.clone(),
+                                    params,
+                                    is_macro: true,
+                                    meta: Rc::new(MalType::Nil),
+                                },
+                            )?),
+                            _ => Err(MalErr::ErrStr(
+                                "Error: Tried to set macro on non function".to_string(),
+                            )),
+                        }
+                    }
+                    MalType::Symbol(ref sym) if sym == "macroexpand" => {
+                        match macroexpand(list[1].clone(), &env) {
+                            (_, Ok(new_ast)) => Ok(new_ast),
+                            (_, e) => return e,
+                        }
+                    }
+                    MalType::Symbol(ref sym) if sym == "try*" => {
+                        match EVAL(list[1].clone(), env.clone()) {
+                            Err(ref e) if list.len() >= 3 => {
+                                let exc = match e {
+                                    MalErr::ErrStr(s) => MalType::Str(s.to_string()),
+                                    MalErr::ErrVal(mal_val) => mal_val.clone(),
+                                };
+                                match list[2].clone() {
+                                    List(c, _) => {
+                                        let catch_env = env_bind(
+                                            Some(env),
+                                            list!(vec![c[1].clone()]),
+                                            vec![exc],
+                                        )?;
+                                        EVAL(c[2].clone(), catch_env)
+                                    }
+                                    _ => Err(MalErr::ErrStr(
+                                        "Error: invalid catch block".to_string(),
+                                    )),
+                                }
+                            }
+                            res => res,
+                        }
+                    }
                     MalType::Symbol(ref sym) if sym == "eval" => {
                         ast = EVAL(list[1].clone(), env.clone())?;
                         while let Some(ref e) = env.clone().outer {
                             env = e.clone()
                         }
+                        continue 'tco;
+                    }
+                    MalType::Symbol(ref sym) if sym == "quote" => Ok(list[1].clone()),
+                    MalType::Symbol(ref a0sym) if a0sym == "quasiquoteexpand" => {
+                        Ok(quasiquote(&list[1]))
+                    }
+                    MalType::Symbol(ref sym) if sym == "quasiquote" => {
+                        ast = quasiquote(&list[1]);
                         continue 'tco;
                     }
                     _ => match eval_ast(&ast, &env)? {
@@ -151,11 +296,11 @@ fn EVAL(mut ast: MalType, mut env: Env) -> MalRes {
                                     continue 'tco;
                                 }
                                 _ => Err(MalErr::ErrStr(
-                                    "Tried to call non function type".to_string(),
+                                    "Error: Tried to call non function type".to_string(),
                                 )),
                             }
                         }
-                        _ => return Err(MalErr::ErrStr("Expected list type".to_string())),
+                        _ => return Err(MalErr::ErrStr("Error: Expected list type".to_string())),
                     },
                 }
             }
@@ -194,12 +339,21 @@ fn main() {
         env_sets(&repl_env, key, val);
     }
     env_sets(&repl_env, "*ARGV*", list!(args.map(MalType::Str).collect()));
-
+    env_sets(
+        &repl_env,
+        "*host-language*",
+        MalType::Str("GRust".to_string()),
+    );
     let _ = rep("(def! not (fn* (a) (if a false true)))", &repl_env);
     let _ = rep(
         r#"(def! load-file (fn* (f) (eval (read-string (str "(do " (slurp f) "\nnil)")))))"#,
         &repl_env,
     );
+    let _ = rep(
+        "(defmacro! cond (fn* (& xs) (if (> (count xs) 0) (list 'if (first xs) (if (> (count xs) 1) (nth xs 1) (throw \"odd number of forms to cond\")) (cons 'cond (rest (rest xs)))))))",
+        &repl_env,
+    );
+
     if let Some(f) = arg1 {
         match rep(&format!("(load-file \"{}\")", f), &repl_env) {
             Ok(_) => std::process::exit(0),
@@ -209,6 +363,7 @@ fn main() {
             }
         }
     }
+    let _ = rep("(println (str \"Mal [\" *host-language* \"]\"))", &repl_env);
     loop {
         let readline = rl.readline("user> ");
         match readline {
@@ -217,11 +372,9 @@ fn main() {
                 println!("{}", PRINT(rep(line.as_str(), &repl_env)));
             }
             Err(ReadlineError::Interrupted) => {
-                println!("CTRL-C");
                 break;
             }
             Err(ReadlineError::Eof) => {
-                println!("CTRL-D");
                 break;
             }
             Err(err) => {

@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use crate::types::{
     hash, MalErr, MalRes,
-    MalType::{self, List, Vector},
+    MalType::{self, List, Nil, Vector},
 };
 
 lazy_static! {
@@ -81,6 +81,15 @@ impl Reader {
                     self.read_form()?
                 ]))
             }
+            Some(Token::Special('^')) => {
+                self.next();
+                let temp = self.read_form()?;
+                Ok(list!(vec![
+                    MalType::Symbol("with-meta".to_string()),
+                    self.read_form()?,
+                    temp
+                ]))
+            }
             Some(Token::TildeAt) => {
                 self.next();
                 Ok(list!(vec![
@@ -115,9 +124,8 @@ impl Reader {
             Some(Token::Chars(chars)) => {
                 if let Ok(num) = chars.parse::<isize>() {
                     Ok(MalType::Int(num))
-                } else if chars.starts_with(':') {
-                    println!("{}", chars);
-                    Ok(MalType::Keyword(format!("\u{029e}{}", &chars[1..])))
+                } else if let Some(stripped) = chars.strip_prefix(':') {
+                    Ok(MalType::Keyword(format!("\u{029e}{}", stripped)))
                 } else {
                     match chars.as_str() {
                         "nil" => Ok(MalType::Nil),
@@ -128,13 +136,7 @@ impl Reader {
                 }
             }
             Some(Token::String(string)) => Ok(MalType::Str(string)),
-            Some(Token::Special(c)) => match c.to_string().as_str() {
-                "^" => Ok(MalType::Meta(
-                    Rc::new(self.read_form()?),
-                    Rc::new(self.read_form()?),
-                )),
-                _ => Ok(MalType::Symbol(c.to_string())),
-            },
+            Some(Token::Special(c)) => Ok(MalType::Symbol(c.to_string())),
             Some(_) => Ok(MalType::Nil),
             None => Err(MalErr::ErrStr("EOF".to_string())),
         }
@@ -176,9 +178,6 @@ pub fn tokenize(input: &str) -> Result<Reader, MalErr> {
                 return Err(MalErr::ErrStr("unbalanced".to_string()));
             }
         }
-        if let Some(semi_start) = m.name("sem") {
-            // tokens.push(Token::Semi(semi_start.as_str().to_string()));
-        }
         if let Some(chars) = m.name("cha") {
             tokens.push(Token::Chars(chars.as_str().to_string()));
         }
@@ -192,6 +191,5 @@ pub enum Token {
     TildeAt,
     Special(char),
     String(String),
-    Semi(String),
     Chars(String),
 }

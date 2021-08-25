@@ -14,13 +14,13 @@ pub fn pr_seq(seq: &[MalType], print_readably: bool, start: &str, end: &str, joi
 pub fn pr_str(value: MalRes, print_readably: bool) -> String {
     let mut result = String::new();
     match value {
-        Ok(MalType::List(list)) => {
+        Ok(MalType::List(list, _)) => {
             result.push_str(pr_seq(&list, print_readably, "(", ")", " ").as_str())
         }
-        Ok(MalType::Vector(vector)) => {
+        Ok(MalType::Vector(vector, _)) => {
             result.push_str(pr_seq(&vector, print_readably, "[", "]", " ").as_str())
         }
-        Ok(MalType::Hash(hash)) => {
+        Ok(MalType::Hash(hash, _)) => {
             let h: Vec<MalType> = hash
                 .iter()
                 .flat_map(|(key, val)| vec![MalType::Str(key.to_string()), val.clone()])
@@ -33,29 +33,16 @@ pub fn pr_str(value: MalRes, print_readably: bool) -> String {
             result.push_str(format!(":{}", &keyword[2..]).as_str());
         }
         Ok(MalType::Str(string)) => {
-            if string.starts_with("\u{29e}") {
-                result.push_str(format!(":{}", &string[2..]).as_str())
+            if let Some(stripped) = string.strip_prefix("\u{029e}") {
+                result.push_str(format!(":{}", stripped).as_str());
             } else if print_readably {
                 result.push_str(format!("\"{}\"", escape(string)).as_str())
             } else {
                 result.push_str(string.as_str())
             }
         }
-        Ok(MalType::Meta(hash, vec)) => {
-            result.push_str("(with-meta ");
-            result.push_str(pr_str(Ok(Rc::try_unwrap(vec).unwrap()), print_readably).as_str());
-            result.push(' ');
-            result.push_str(pr_str(Ok(Rc::try_unwrap(hash).unwrap()), print_readably).as_str());
-            result.push(')');
-        }
-        Ok(MalType::Func(_)) => result.push_str("#<function>"),
-        Ok(MalType::MalFunc {
-            eval: _,
-            ast: _,
-            env: _,
-            params: _,
-            ..
-        }) => result.push_str("#<function>"),
+        Ok(MalType::Func(_, _)) => result.push_str("#<function>"),
+        Ok(MalType::MalFunc { .. }) => result.push_str("#<function>"),
         Ok(MalType::Atom(a)) => {
             result.push_str(format!("(atom {})", pr_str(Ok(a.borrow().to_owned()), true)).as_str())
         }
@@ -66,7 +53,6 @@ pub fn pr_str(value: MalRes, print_readably: bool) -> String {
         Err(MalErr::ErrVal(val)) => {
             result.push_str(format!("Error: {}", pr_str(Ok(val), print_readably).as_str()).as_str())
         }
-        _ => (),
     }
     result
 }

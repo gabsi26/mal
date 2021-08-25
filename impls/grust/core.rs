@@ -1,6 +1,10 @@
+use lazy_static::lazy_static;
+use rustyline::Editor;
 use std::fs::File;
 use std::io::Read;
 use std::rc::Rc;
+use std::sync::Mutex;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::printer::pr_seq;
 use crate::read_str;
@@ -41,7 +45,7 @@ fn slurp(f: String) -> MalRes {
 
 fn cons(args: MalArgs) -> MalRes {
     match args[1].clone() {
-        List(list) | Vector(list) => {
+        List(list, _) | Vector(list, _) => {
             let mut new_list = vec![args[0].clone()];
             new_list.extend_from_slice(&list);
             Ok(list!(new_list.to_vec()))
@@ -57,7 +61,7 @@ fn concat(args: MalArgs) -> MalRes {
     let mut new_list: MalArgs = vec![];
     for list in args {
         match list {
-            MalType::List(l) | MalType::Vector(l) => {
+            MalType::List(l, _) | MalType::Vector(l, _) => {
                 new_list.extend_from_slice(&l);
             }
             _ => return Err(MalErr::ErrStr("Error: Non list type found".to_string())),
@@ -68,14 +72,14 @@ fn concat(args: MalArgs) -> MalRes {
 
 fn vec(a: MalArgs) -> MalRes {
     match a[0] {
-        List(ref v) | Vector(ref v) => Ok(vector!(v.to_vec())),
+        List(ref v, _) | Vector(ref v, _) => Ok(vector!(v.to_vec())),
         _ => Err(MalErr::ErrStr("Error: Non list type found".to_string())),
     }
 }
 
 fn nth(a: MalArgs) -> MalRes {
     match a[0] {
-        List(ref v) | Vector(ref v) => match a[1] {
+        List(ref v, _) | Vector(ref v, _) => match a[1] {
             MalType::Int(index) => match v.get(index as usize) {
                 Some(val) => Ok(val.clone()),
                 _ => Err(MalErr::ErrStr("Error: Index out of bounds".to_string())),
@@ -88,7 +92,7 @@ fn nth(a: MalArgs) -> MalRes {
 
 fn first(a: MalArgs) -> MalRes {
     match a[0] {
-        List(ref v) | Vector(ref v) => {
+        List(ref v, _) | Vector(ref v, _) => {
             if v.is_empty() {
                 Ok(Nil)
             } else {
@@ -104,7 +108,7 @@ fn first(a: MalArgs) -> MalRes {
 
 fn rest(a: MalArgs) -> MalRes {
     match a[0] {
-        List(ref v) | Vector(ref v) => {
+        List(ref v, _) | Vector(ref v, _) => {
             if v.is_empty() {
                 Ok(list!(vec![]))
             } else {
@@ -120,7 +124,7 @@ fn rest(a: MalArgs) -> MalRes {
 
 fn apply(a: MalArgs) -> MalRes {
     match a[a.len() - 1] {
-        List(ref v) | Vector(ref v) => {
+        List(ref v, _) | Vector(ref v, _) => {
             let f = &a[0];
             let mut fargs = a[1..a.len() - 1].to_vec();
             fargs.extend_from_slice(&v);
@@ -134,7 +138,7 @@ fn apply(a: MalArgs) -> MalRes {
 
 fn map(a: MalArgs) -> MalRes {
     match a[1] {
-        List(ref v) | Vector(ref v) => {
+        List(ref v, _) | Vector(ref v, _) => {
             let mut res = vec![];
             for mv in v.iter() {
                 res.push(a[0].apply(vec![mv.clone()])?)
@@ -149,7 +153,7 @@ fn map(a: MalArgs) -> MalRes {
 
 fn get(a: MalArgs) -> MalRes {
     match a[0].clone() {
-        Hash(hm) => match a[1].clone() {
+        Hash(hm, _) => match a[1].clone() {
             MalType::Symbol(s) => {
                 if let Some(mv) = hm.get(&s) {
                     Ok(mv.clone())
@@ -171,7 +175,7 @@ fn get(a: MalArgs) -> MalRes {
                     Ok(MalType::Nil)
                 }
             }
-            _ => return Err(MalErr::ErrStr("Wrong key type".to_string())),
+            _ => Err(MalErr::ErrStr("Wrong key type".to_string())),
         },
         _ => Ok(MalType::Nil),
     }
@@ -179,7 +183,7 @@ fn get(a: MalArgs) -> MalRes {
 
 fn contains(a: MalArgs) -> MalRes {
     match a[0].clone() {
-        Hash(hm) => match a[1].clone() {
+        Hash(hm, _) => match a[1].clone() {
             MalType::Symbol(s) => {
                 if hm.contains_key(&s) {
                     Ok(MalType::True)
@@ -201,15 +205,37 @@ fn contains(a: MalArgs) -> MalRes {
                     Ok(MalType::False)
                 }
             }
-            _ => return Err(MalErr::ErrStr("Wrong key type".to_string())),
+            _ => Err(MalErr::ErrStr("Wrong key type".to_string())),
         },
         _ => Ok(MalType::False),
     }
 }
 
+fn readline(a: MalArgs) -> MalRes {
+    lazy_static! {
+        static ref RL: Mutex<Editor<()>> = Mutex::new(Editor::<()>::new());
+    }
+    match a[0] {
+        Str(ref p) => match RL.lock().unwrap().readline(p) {
+            Ok(mut line) => {
+                if line.ends_with('\n') {
+                    line.pop();
+                    if line.ends_with('\r') {
+                        line.pop();
+                    }
+                }
+                Ok(Str(line))
+            }
+            Err(rustyline::error::ReadlineError::Eof) => Ok(MalType::Nil),
+            Err(e) => Err(MalErr::ErrStr(format!("{:?}", e))),
+        },
+        _ => Err(MalErr::ErrStr("Prompt is not Str".to_string())),
+    }
+}
+
 fn keys(a: MalArgs) -> MalRes {
     match a[0].clone() {
-        Hash(hm) => {
+        Hash(hm, _) => {
             let mut list: MalArgs = vec![];
             for key in hm.keys() {
                 if key.starts_with('\u{029e}') {
@@ -226,7 +252,7 @@ fn keys(a: MalArgs) -> MalRes {
 
 fn vals(a: MalArgs) -> MalRes {
     match a[0].clone() {
-        Hash(hm) => {
+        Hash(hm, _) => {
             let mut list: MalArgs = vec![];
             for val in hm.values() {
                 list.push(val.clone());
@@ -234,6 +260,74 @@ fn vals(a: MalArgs) -> MalRes {
             Ok(list!(list))
         }
         _ => Ok(MalType::False),
+    }
+}
+
+fn meta(a: MalArgs) -> MalRes {
+    match a[0].clone() {
+        List(_, m) | Vector(_, m) | Hash(_, m) | Func(_, m) | MalFunc { meta: m, .. } => {
+            Ok((*m).clone())
+        }
+        _ => Err(MalErr::ErrStr("Type has no meta-data".to_string())),
+    }
+}
+fn with_meta(a: MalArgs) -> MalRes {
+    let new_meta = a[1].clone();
+    match a[0].clone() {
+        List(l, _) => Ok(List(l, Rc::new(new_meta))),
+        Vector(l, _) => Ok(Vector(l, Rc::new(new_meta))),
+        Hash(l, _) => Ok(Hash(l, Rc::new(new_meta))),
+        Func(l, _) => Ok(Func(l, Rc::new(new_meta))),
+        MalFunc {
+            eval,
+            env,
+            ast,
+            params,
+            is_macro,
+            ..
+        } => Ok(MalFunc {
+            eval,
+            env,
+            ast,
+            params,
+            is_macro,
+            meta: Rc::new(new_meta),
+        }),
+        _ => Err(MalErr::ErrStr("Type has no meta-data".to_string())),
+    }
+}
+
+fn time_ms(_a: MalArgs) -> MalRes {
+    let ms_e = match SystemTime::now().duration_since(UNIX_EPOCH) {
+        Ok(d) => d,
+        Err(e) => return Err(MalErr::ErrStr(format!("{:?}", e))),
+    };
+    Ok(Int(
+        ms_e.as_secs() as isize * 1000 + ms_e.subsec_nanos() as isize / 1_000_000
+    ))
+}
+
+fn conj(a: MalArgs) -> MalRes {
+    match a[0] {
+        List(ref v, _) => {
+            let sl = a[1..].iter().rev().cloned().collect::<Vec<MalType>>();
+            Ok(list!([&sl[..], v].concat()))
+        }
+        Vector(ref v, _) => Ok(vector!([v, &a[1..]].concat())),
+        _ => Err(MalErr::ErrStr("conj called with non sequence".to_string())),
+    }
+}
+
+fn seq(a: MalArgs) -> MalRes {
+    match a[0] {
+        List(ref v, _) | Vector(ref v, _) if v.len() == 0 => Ok(Nil),
+        List(ref v, _) | Vector(ref v, _) => Ok(list!(v.to_vec())),
+        Str(ref s) if s.is_empty() => Ok(Nil),
+        Str(ref s) if a[0].is_keyword() == MalType::False => {
+            Ok(list!(s.chars().map(|c| { Str(c.to_string()) }).collect()))
+        }
+        Nil => Ok(Nil),
+        _ => Err(MalErr::ErrStr("seq called with non sequence".to_string())),
     }
 }
 
@@ -313,7 +407,7 @@ pub fn ns() -> Vec<(&'static str, MalType)> {
         (
             "list?",
             func(|c| {
-                if let MalType::List(_) = c[0] {
+                if let MalType::List(_, _) = c[0] {
                     Ok(MalType::True)
                 } else {
                     Ok(MalType::False)
@@ -323,14 +417,14 @@ pub fn ns() -> Vec<(&'static str, MalType)> {
         (
             "empty?",
             func(|c| match c[0].clone() {
-                MalType::List(list) => {
+                MalType::List(list, _) => {
                     if list.is_empty() {
                         Ok(MalType::True)
                     } else {
                         Ok(MalType::False)
                     }
                 }
-                MalType::Vector(vector) => {
+                MalType::Vector(vector, _) => {
                     if vector.is_empty() {
                         Ok(MalType::True)
                     } else {
@@ -343,8 +437,8 @@ pub fn ns() -> Vec<(&'static str, MalType)> {
         (
             "count",
             func(|c| match c[0].clone() {
-                MalType::List(list) => Ok(MalType::Int(list.len() as isize)),
-                MalType::Vector(vector) => Ok(MalType::Int(vector.len() as isize)),
+                MalType::List(list, _) => Ok(MalType::Int(list.len() as isize)),
+                MalType::Vector(vector, _) => Ok(MalType::Int(vector.len() as isize)),
                 _ => Ok(MalType::Int(0)),
             }),
         ),
@@ -404,5 +498,15 @@ pub fn ns() -> Vec<(&'static str, MalType)> {
         ("throw", func(|c| Err(MalErr::ErrVal(c[0].clone())))),
         ("apply", func(apply)),
         ("map", func(map)),
+        ("readline", func(readline)),
+        ("meta", func(meta)),
+        ("with-meta", func(with_meta)),
+        ("time-ms", func(time_ms)),
+        ("fn?", func(|c| Ok(c[0].is_fn()))),
+        ("string?", func(|c| Ok(c[0].is_string()))),
+        ("number?", func(|c| Ok(c[0].is_number()))),
+        ("macro?", func(|c| Ok(c[0].is_macro()))),
+        ("seq", func(seq)),
+        ("conj", func(conj)),
     ]
 }

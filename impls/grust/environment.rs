@@ -1,7 +1,7 @@
 use crate::types::{MalErr, MalRes, MalType};
 
 use crate::list;
-use crate::types::MalType::List;
+use crate::types::MalType::{List, Nil};
 use std::cell::RefCell;
 use std::{collections::HashMap, rc::Rc};
 #[derive(Debug, Clone, PartialEq)]
@@ -22,7 +22,7 @@ pub fn env_new(outer: Option<Env>) -> Env {
 pub fn env_bind(outer: Option<Env>, mbinds: MalType, exprs: Vec<MalType>) -> Result<Env, MalErr> {
     let env = env_new(outer);
     match mbinds {
-        MalType::List(binds) | MalType::Vector(binds) => {
+        MalType::List(binds, _) | MalType::Vector(binds, _) => {
             for (i, b) in binds.iter().enumerate() {
                 match b {
                     MalType::Symbol(s) if s == "&" => {

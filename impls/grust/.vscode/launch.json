@@ -243,5 +243,23 @@
             "args": [],
             "cwd": "${workspaceFolder}"
         },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'stepA_mal'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=stepA_mal",
+                    "--package=grust"
+                ],
+                "filter": {
+                    "name": "stepA_mal",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
     ]
 }

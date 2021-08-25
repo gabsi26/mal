@@ -11,22 +11,22 @@ use std::rc::Rc;
 #[macro_export]
 macro_rules! list {
     ($seq:expr) => {{
-      List(Rc::new($seq))
+      List(Rc::new($seq),Rc::new(Nil))
     }};
     [$($args:expr),*] => {{
       let v: Vec<MalType> = vec![$($args),*];
-      List(Rc::new(v))
+      List(Rc::new(v),Rc::new(Nil))
     }}
   }
 
 #[macro_export]
 macro_rules! vector {
     ($seq:expr) => {{
-      Vector(Rc::new($seq))
+      Vector(Rc::new($seq),Rc::new(Nil))
     }};
     [$($args:expr),*] => {{
       let v: Vec<MalType> = vec![$($args),*];
-      Vector(Rc::new(v))
+      Vector(Rc::new(v),Rc::new(Nil))
     }}
   }
 
@@ -35,21 +35,21 @@ pub enum MalType {
     Nil,
     True,
     False,
-    List(Rc<Vec<MalType>>),
-    Vector(Rc<Vec<MalType>>),
-    Hash(Rc<HashMap<String, MalType>>),
+    List(Rc<Vec<MalType>>, Rc<MalType>),
+    Vector(Rc<Vec<MalType>>, Rc<MalType>),
+    Hash(Rc<HashMap<String, MalType>>, Rc<MalType>),
     Int(isize),
     Symbol(String),
     Str(String),
     Keyword(String),
-    Meta(Rc<MalType>, Rc<MalType>),
-    Func(fn(MalArgs) -> MalRes),
+    Func(fn(MalArgs) -> MalRes, Rc<MalType>),
     MalFunc {
         eval: fn(ast: MalType, env: Env) -> MalRes,
         ast: Rc<MalType>,
         env: Env,
         params: Rc<MalType>,
         is_macro: bool,
+        meta: Rc<MalType>,
     },
     Atom(Rc<RefCell<MalType>>),
 }
@@ -57,7 +57,7 @@ pub enum MalType {
 impl MalType {
     pub fn apply(&self, args: MalArgs) -> MalRes {
         match *self {
-            Func(f) => f(args),
+            Func(f, _) => f(args),
             MalFunc {
                 eval,
                 ref ast,
@@ -118,24 +118,52 @@ impl MalType {
         }
     }
     pub fn is_vector(&self) -> MalType {
-        if let MalType::Vector(_) = self {
+        if let MalType::Vector(_, _) = self {
             MalType::True
         } else {
             MalType::False
         }
     }
     pub fn is_sequential(&self) -> MalType {
-        if let MalType::Vector(_) | MalType::List(_) = self {
+        if let MalType::Vector(_, _) | MalType::List(_, _) = self {
             MalType::True
         } else {
             MalType::False
         }
     }
     pub fn is_map(&self) -> MalType {
-        if let MalType::Hash(_) = self {
+        if let MalType::Hash(_, _) = self {
             MalType::True
         } else {
             MalType::False
+        }
+    }
+    pub fn is_string(&self) -> MalType {
+        if let MalType::Str(_) = self {
+            MalType::True
+        } else {
+            MalType::False
+        }
+    }
+    pub fn is_number(&self) -> MalType {
+        if let MalType::Int(__) = self {
+            MalType::True
+        } else {
+            MalType::False
+        }
+    }
+    pub fn is_fn(&self) -> MalType {
+        match self {
+            MalType::Func(_, _) => MalType::True,
+            MalType::MalFunc { is_macro: m, .. } if !m => MalType::True,
+            _ => MalType::False,
+        }
+    }
+    pub fn is_macro(&self) -> MalType {
+        match self {
+            MalType::MalFunc { is_macro: m, .. } if *m => MalType::True,
+            MalType::MalFunc { .. } => MalType::False,
+            _ => MalType::False,
         }
     }
 
@@ -204,11 +232,11 @@ pub fn hash(seq: Vec<MalType>) -> MalRes {
         };
         hash.insert(key.to_owned(), v.to_owned());
     }
-    Ok(MalType::Hash(Rc::new(hash)))
+    Ok(MalType::Hash(Rc::new(hash), Rc::new(MalType::Nil)))
 }
 
 pub fn func(f: fn(MalArgs) -> MalRes) -> MalType {
-    MalType::Func(f)
+    MalType::Func(f, Rc::new(MalType::Nil))
 }
 pub fn atom(mv: &MalType) -> MalType {
     MalType::Atom(Rc::new(RefCell::new(mv.clone())))
@@ -225,8 +253,9 @@ pub fn symbol(a: &MalType) -> MalRes {
 pub fn keyword(a: &MalType) -> MalRes {
     match a {
         MalType::Str(s) => Ok(MalType::Keyword(format!("\u{029e}{}", s))),
+        MalType::Keyword(s) => Ok(a.clone()),
         _ => Err(MalErr::ErrStr(
-            "Tried to convert non string into symbol".to_string(),
+            "Tried to convert non string into keyword".to_string(),
         )),
     }
 }
@@ -255,12 +284,12 @@ pub fn hash_map(a: MalArgs) -> MalRes {
             _ => return Err(MalErr::ErrStr("Wrong key type".to_string())),
         }
     }
-    Ok(Hash(Rc::new(hm)))
+    Ok(Hash(Rc::new(hm), Rc::new(MalType::Nil)))
 }
 
 pub fn assoc(a: MalArgs) -> MalRes {
     match a[0].clone() {
-        MalType::Hash(ohm) => {
+        MalType::Hash(ohm, _) => {
             let mut hm: HashMap<String, MalType> = HashMap::new();
             for (k, v) in ohm.clone().iter() {
                 hm.insert(k.clone(), v.clone());
@@ -279,7 +308,7 @@ pub fn assoc(a: MalArgs) -> MalRes {
                     _ => return Err(MalErr::ErrStr("Wrong key type".to_string())),
                 }
             }
-            Ok(Hash(Rc::new(hm)))
+            Ok(Hash(Rc::new(hm), Rc::new(MalType::Nil)))
         }
         _ => Err(MalErr::ErrStr("Expected hash-map".to_string())),
     }
@@ -287,7 +316,7 @@ pub fn assoc(a: MalArgs) -> MalRes {
 
 pub fn dissoc(a: MalArgs) -> MalRes {
     match a[0].clone() {
-        MalType::Hash(ohm) => {
+        MalType::Hash(ohm, _) => {
             let mut hm = (*ohm).clone();
             for key in a[1..].iter() {
                 match key {
@@ -303,7 +332,7 @@ pub fn dissoc(a: MalArgs) -> MalRes {
                     _ => return Err(MalErr::ErrStr("Wrong key type".to_string())),
                 }
             }
-            Ok(Hash(Rc::new(hm)))
+            Ok(Hash(Rc::new(hm), Rc::new(MalType::Nil)))
         }
         _ => Err(MalErr::ErrStr("Expected hash-map".to_string())),
     }
@@ -319,11 +348,11 @@ impl PartialEq for MalType {
             (Str(ref a), Str(ref b)) => a == b,
             (Symbol(ref a), Symbol(ref b)) => a == b,
             (Keyword(ref a), Keyword(ref b)) => a == b,
-            (List(ref a), List(ref b))
-            | (List(ref a), Vector(ref b))
-            | (Vector(ref a), List(ref b))
-            | (Vector(ref a), Vector(ref b)) => a == b,
-            (Hash(ref a), Hash(ref b)) => a == b,
+            (List(ref a, _), List(ref b, _))
+            | (List(ref a, _), Vector(ref b, _))
+            | (Vector(ref a, _), List(ref b, _))
+            | (Vector(ref a, _), Vector(ref b, _)) => a == b,
+            (Hash(ref a, _), Hash(ref b, _)) => a == b,
             _ => false,
         }
     }

@@ -28,26 +28,26 @@ fn eval_ast(ast: &MalType, env: &Env) -> MalRes {
             Ok(value) => Ok(value),
             Err(err) => Err(err),
         },
-        MalType::List(list) => {
+        MalType::List(list, _) => {
             let mut evaluated: Vec<MalType> = vec![];
             for value in list.iter() {
                 evaluated.push(EVAL(value.clone(), env.clone())?);
             }
             Ok(list!(evaluated))
         }
-        MalType::Vector(vector) => {
+        MalType::Vector(vector, _) => {
             let mut evaluated: Vec<MalType> = vec![];
             for value in vector.iter() {
                 evaluated.push(EVAL(value.clone(), env.clone())?);
             }
             Ok(vector!(evaluated))
         }
-        MalType::Hash(hash) => {
+        MalType::Hash(hash, _) => {
             let mut evaluated: HashMap<String, MalType> = HashMap::new();
             for (key, value) in hash.iter() {
                 evaluated.insert(key.clone(), EVAL(value.clone(), env.clone())?);
             }
-            Ok(MalType::Hash(Rc::new(evaluated)))
+            Ok(MalType::Hash(Rc::new(evaluated), Rc::new(MalType::Nil)))
         }
         _ => Ok(ast.clone()),
     }
@@ -56,7 +56,7 @@ fn eval_ast(ast: &MalType, env: &Env) -> MalRes {
 #[allow(non_snake_case)]
 fn EVAL(ast: MalType, env: Env) -> MalRes {
     match ast.clone() {
-        MalType::List(list) => {
+        MalType::List(list, _) => {
             if list.is_empty() {
                 Ok(ast)
             } else if let MalType::Symbol(command) = list[0].clone() {
@@ -72,7 +72,7 @@ fn EVAL(ast: MalType, env: Env) -> MalRes {
                         let let_env = env_new(Some(env));
                         let (a1, a2) = (list[1].clone(), list[2].clone());
                         match a1 {
-                            MalType::List(binds) | MalType::Vector(binds) => {
+                            MalType::List(binds, _) | MalType::Vector(binds, _) => {
                                 for (b, e) in binds.iter().tuples() {
                                     match b {
                                         MalType::Symbol(_) => {
@@ -95,7 +95,7 @@ fn EVAL(ast: MalType, env: Env) -> MalRes {
                         EVAL(a2, let_env)
                     }
                     "do" => match eval_ast(&list!(list[1..].to_vec()), &env)? {
-                        MalType::List(el) => Ok(el.last().unwrap_or(&Nil).clone()),
+                        MalType::List(el, _) => Ok(el.last().unwrap_or(&Nil).clone()),
                         _ => Err(MalErr::ErrStr("Expected list type".to_string())),
                     },
                     "if" => {
@@ -114,9 +114,10 @@ fn EVAL(ast: MalType, env: Env) -> MalRes {
                         params: Rc::new(list[1].clone()),
                         env,
                         is_macro: false,
+                        meta: Rc::new(MalType::Nil),
                     }),
                     _ => {
-                        if let MalType::List(list) = eval_ast(&ast, &env)? {
+                        if let MalType::List(list, _) = eval_ast(&ast, &env)? {
                             list[0].apply(list[1..].to_vec())
                         } else {
                             Err(MalErr::ErrStr(
@@ -125,7 +126,7 @@ fn EVAL(ast: MalType, env: Env) -> MalRes {
                         }
                     }
                 }
-            } else if let MalType::List(list) = eval_ast(&ast, &env)? {
+            } else if let MalType::List(list, _) = eval_ast(&ast, &env)? {
                 list[0].apply(list[1..].to_vec())
             } else {
                 Err(MalErr::ErrStr(

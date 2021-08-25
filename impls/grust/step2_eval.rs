@@ -10,7 +10,7 @@ use crate::printer::pr_str;
 use crate::reader::read_str;
 use crate::types::{
     MalArgs, MalErr,
-    MalType::{self, List, Vector},
+    MalType::{self, List, Nil, Vector},
 };
 
 pub type Env = HashMap<String, MalType>;
@@ -34,26 +34,26 @@ fn eval_ast(ast: MalType, env: Env) -> MalRes {
             Some(value) => Ok(value.clone()),
             None => Err(MalErr::ErrStr(format!("{} not found", sym))),
         },
-        MalType::List(list) => {
+        MalType::List(list, _) => {
             let mut evaluated: Vec<MalType> = vec![];
             for value in list.iter() {
                 evaluated.push(EVAL(Ok(value.clone()), env.clone())?);
             }
             Ok(list!(evaluated))
         }
-        MalType::Vector(vector) => {
+        MalType::Vector(vector, _) => {
             let mut evaluated: Vec<MalType> = vec![];
             for value in vector.iter() {
                 evaluated.push(EVAL(Ok(value.clone()), env.clone())?);
             }
             Ok(vector!(evaluated))
         }
-        MalType::Hash(hash) => {
+        MalType::Hash(hash, _) => {
             let mut evaluated: HashMap<String, MalType> = HashMap::new();
             for (key, value) in hash.iter() {
                 evaluated.insert(key.clone(), EVAL(Ok(value.clone()), env.clone())?);
             }
-            Ok(MalType::Hash(Rc::new(evaluated)))
+            Ok(MalType::Hash(Rc::new(evaluated), Rc::new(MalType::Nil)))
         }
         _ => Ok(ast),
     }
@@ -62,10 +62,10 @@ fn eval_ast(ast: MalType, env: Env) -> MalRes {
 #[allow(non_snake_case)]
 fn EVAL(ast: MalRes, env: Env) -> MalRes {
     match ast.clone() {
-        Ok(MalType::List(list)) => {
+        Ok(MalType::List(list, _)) => {
             if list.is_empty() {
                 ast
-            } else if let MalType::List(list) = eval_ast(ast?, env)? {
+            } else if let MalType::List(list, _) = eval_ast(ast?, env)? {
                 list[0].apply(list[1..].to_vec())
             } else {
                 Err(MalErr::ErrStr(
@@ -100,19 +100,19 @@ fn main() {
     let mut repl_env = Env::default();
     repl_env.insert(
         "+".to_string(),
-        MalType::Func(|a: MalArgs| int_op(|i, j| i + j, a)),
+        MalType::Func(|a: MalArgs| int_op(|i, j| i + j, a), Rc::new(MalType::Nil)),
     );
     repl_env.insert(
         "-".to_string(),
-        MalType::Func(|a: MalArgs| int_op(|i, j| i - j, a)),
+        MalType::Func(|a: MalArgs| int_op(|i, j| i - j, a), Rc::new(MalType::Nil)),
     );
     repl_env.insert(
         "*".to_string(),
-        MalType::Func(|a: MalArgs| int_op(|i, j| i * j, a)),
+        MalType::Func(|a: MalArgs| int_op(|i, j| i * j, a), Rc::new(MalType::Nil)),
     );
     repl_env.insert(
         "/".to_string(),
-        MalType::Func(|a: MalArgs| int_op(|i, j| i / j, a)),
+        MalType::Func(|a: MalArgs| int_op(|i, j| i / j, a), Rc::new(MalType::Nil)),
     );
     loop {
         let readline = rl.readline("user> ");
