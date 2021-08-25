@@ -3,32 +3,28 @@ use std::rc::Rc;
 use crate::types::{MalErr, MalRes, MalType};
 use crate::utils::escape;
 
+pub fn pr_seq(
+    seq: &Vec<MalType>,
+    print_readably: bool,
+    start: &str,
+    end: &str,
+    join: &str,
+) -> String {
+    let strs: Vec<String> = seq
+        .iter()
+        .map(|x| pr_str(Ok(x.clone()), print_readably))
+        .collect();
+    format!("{}{}{}", start, strs.join(join), end)
+}
+
 pub fn pr_str(value: MalRes, print_readably: bool) -> String {
     let mut result = String::new();
     match value {
         Ok(MalType::List(list)) => {
-            result.push('(');
-            for item in list {
-                result.push_str(pr_str(Ok(item), print_readably).as_str());
-                result.push(' ');
-            }
-            if result.len() > 1 {
-                result.remove(result.len() - 1);
-            }
-
-            result.push(')');
+            result.push_str(pr_seq(&list, print_readably, "(", ")", " ").as_str())
         }
         Ok(MalType::Vector(vector)) => {
-            result.push('[');
-            for item in vector {
-                result.push_str(pr_str(Ok(item), print_readably).as_str());
-                result.push(' ');
-            }
-            if result.len() > 1 {
-                result.remove(result.len() - 1);
-            }
-
-            result.push(']');
+            result.push_str(pr_seq(&vector, print_readably, "[", "]", " ").as_str())
         }
         Ok(MalType::Hash(hash)) => {
             result.push('{');
@@ -57,14 +53,13 @@ pub fn pr_str(value: MalRes, print_readably: bool) -> String {
             result.push_str(format!(":{}", &keyword[2..]).as_str());
         }
         Ok(MalType::Str(string)) => {
-            result.push('"');
-            if print_readably {
-                result.push_str(escape(string).as_str());
+            if string.starts_with("\u{29e}") {
+                result.push_str(format!(":{}", &string[2..]).as_str())
+            } else if print_readably {
+                result.push_str(format!("\"{}\"", escape(string)).as_str())
             } else {
-                result.push_str(string.as_str());
+                result.push_str(string.as_str())
             }
-
-            result.push('"');
         }
         Ok(MalType::Quote(quoted)) => {
             result.push_str("(quote ");
@@ -98,6 +93,13 @@ pub fn pr_str(value: MalRes, print_readably: bool) -> String {
             result.push_str(pr_str(Ok(Rc::try_unwrap(hash).unwrap()), print_readably).as_str());
             result.push(')');
         }
+        Ok(MalType::Func(_)) => result.push_str("#<function>"),
+        Ok(MalType::MalFunc {
+            eval: _,
+            ast: _,
+            env: _,
+            params: _,
+        }) => result.push_str("#<function>"),
         Ok(MalType::Nil) => result.push_str("nil"),
         Ok(MalType::True) => result.push_str("true"),
         Ok(MalType::False) => result.push_str("false"),

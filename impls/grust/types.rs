@@ -1,7 +1,9 @@
+use crate::env::{env_bind, env_new, Env};
 use crate::types::MalType::{
-    False, Func, Hash, Int, Keyword, List, Nil, Str, Symbol, True, Vector,
+    False, Func, Hash, Int, Keyword, List, MalFunc, Nil, Str, Symbol, True, Vector,
 };
 use itertools::Itertools;
+
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -24,14 +26,30 @@ pub enum MalType {
     Deref(Rc<MalType>),
     Meta(Rc<MalType>, Rc<MalType>),
     Func(fn(MalArgs) -> MalRes),
+    MalFunc {
+        eval: fn(ast: MalType, env: Env) -> MalRes,
+        ast: Rc<MalType>,
+        env: Env,
+        params: Rc<MalType>,
+    },
 }
 
 impl MalType {
     pub fn apply(&self, args: MalArgs) -> MalRes {
-        if let Func(f) = *self {
-            f(args)
-        } else {
-            Err(MalErr::CalledNonFunctionType)
+        match *self {
+            Func(f) => f(args),
+            MalFunc {
+                eval,
+                ref ast,
+                ref env,
+                ref params,
+            } => {
+                let a = &**ast;
+                let p = &**params;
+                let fn_env = env_bind(Some(env.clone()), p.clone(), args)?;
+                Ok(eval(a.clone(), fn_env)?)
+            }
+            _ => Err(MalErr::CalledNonFunctionType),
         }
     }
 }
@@ -69,6 +87,10 @@ pub fn hash(seq: Vec<MalType>) -> MalRes {
     Ok(MalType::Hash(hash))
 }
 
+pub fn func(f: fn(MalArgs) -> MalRes) -> MalType {
+    MalType::Func(f)
+}
+
 impl PartialEq for MalType {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -78,6 +100,7 @@ impl PartialEq for MalType {
             (Int(ref a), Int(ref b)) => a == b,
             (Str(ref a), Str(ref b)) => a == b,
             (Symbol(ref a), Symbol(ref b)) => a == b,
+            (Keyword(ref a), Keyword(ref b)) => a == b,
             (List(ref a), List(ref b))
             | (List(ref a), Vector(ref b))
             | (Vector(ref a), List(ref b))

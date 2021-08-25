@@ -133,9 +133,9 @@ pub fn tokenize(input: &str) -> Result<Reader, MalErr> {
         if let Some(string) = m.name("str") {
             if string.as_str().len() > 1 {
                 if STR_RE.is_match(string.as_str()) {
-                    let temp = unescape(&string.as_str());
-                    println!("{}", temp);
-                    tokens.push(Token::String(temp[1..temp.len() - 1].to_string()));
+                    tokens.push(Token::String(
+                        unescape(&string.as_str()[1..string.as_str().len() - 1]).to_string(),
+                    ));
                 } else {
                     return Err(MalErr::UnmatchedDoubleQuote);
                 }
